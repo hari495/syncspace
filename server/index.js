@@ -1,6 +1,6 @@
-const http = require('http');
-const WebSocket = require('ws');
-const { setupWSConnection } = require('y-websocket/bin/utils');
+import http from 'http';
+import { WebSocketServer } from 'ws';
+import { setupWSConnection } from '@y/websocket-server/utils';
 
 const PORT = 1234;
 
@@ -9,13 +9,13 @@ const server = http.createServer((req, res) => {
   res.end('SyncSpace Y.js WebSocket Server');
 });
 
-const wss = new WebSocket.Server({ server });
+const wss = new WebSocketServer({ server });
 
 wss.on('connection', (ws, req) => {
   console.log('New client connected');
 
   setupWSConnection(ws, req, {
-    gc: true // Enable garbage collection for outdated documents
+    gc: true
   });
 
   ws.on('close', () => {
