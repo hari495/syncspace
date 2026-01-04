@@ -1,11 +1,12 @@
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { Stage, Layer, Rect, Circle, Transformer, Line, Text } from 'react-konva';
+import { Stage, Layer, Rect, Circle, Transformer } from 'react-konva';
 import Konva from 'konva';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import Cursor from './Cursor';
 import { ShareDialog } from './components/workspace/ShareDialog';
 import { supabase } from './config/supabase';
+import { MemoizedRectangle, MemoizedCircle, MemoizedLine, MemoizedText } from './components/whiteboard/MemoizedShapes';
 
 type Tool = 'select' | 'rectangle' | 'pencil' | 'text' | null;
 
@@ -1255,79 +1256,75 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
         {/* Main Content Layer */}
         <Layer>
           {Array.from(shapes.values()).map((shape) => {
+            const isSelected = selectedIds.has(shape.id);
+            const shapeRef = (node: Konva.Shape | null) => {
+              if (node) {
+                shapeRefs.current.set(shape.id, node);
+              }
+            };
+
             if (shape.type === 'rectangle') {
               return (
-                <Rect
+                <MemoizedRectangle
                   key={shape.id}
-                  ref={(node) => {
-                    if (node) {
-                      shapeRefs.current.set(shape.id, node);
-                    }
-                  }}
+                  id={shape.id}
                   x={shape.x}
                   y={shape.y}
                   width={shape.width}
                   height={shape.height}
-                  fill={shape.color}
-                  stroke={selectedIds.has(shape.id) ? '#6366F1' : undefined}
-                  strokeWidth={selectedIds.has(shape.id) ? 2 : 0}
-                  rotation={shape.rotation || 0}
-                  scaleX={shape.scaleX || 1}
-                  scaleY={shape.scaleY || 1}
-                  draggable={tool === 'select' && canEdit}
+                  color={shape.color}
+                  rotation={shape.rotation}
+                  scaleX={shape.scaleX}
+                  scaleY={shape.scaleY}
+                  isSelected={isSelected}
+                  canEdit={canEdit}
+                  tool={tool}
                   onClick={() => handleShapeClick(shape.id)}
-                  onTap={() => handleShapeClick(shape.id)}
                   onDragEnd={(e) => handleDragEnd(shape.id, e)}
                   onTransformEnd={(e) => handleTransformEnd(shape.id, e)}
+                  shapeRef={shapeRef}
                 />
               );
             } else if (shape.type === 'circle') {
               return (
-                <Circle
+                <MemoizedCircle
                   key={shape.id}
-                  ref={(node) => {
-                    if (node) {
-                      shapeRefs.current.set(shape.id, node);
-                    }
-                  }}
+                  id={shape.id}
                   x={shape.x}
                   y={shape.y}
                   radius={shape.radius}
-                  fill={shape.color}
-                  stroke={selectedIds.has(shape.id) ? '#6366F1' : undefined}
-                  strokeWidth={selectedIds.has(shape.id) ? 2 : 0}
-                  rotation={shape.rotation || 0}
-                  scaleX={shape.scaleX || 1}
-                  scaleY={shape.scaleY || 1}
-                  draggable={tool === 'select' && canEdit}
+                  color={shape.color}
+                  rotation={shape.rotation}
+                  scaleX={shape.scaleX}
+                  scaleY={shape.scaleY}
+                  isSelected={isSelected}
+                  canEdit={canEdit}
+                  tool={tool}
                   onClick={() => handleShapeClick(shape.id)}
-                  onTap={() => handleShapeClick(shape.id)}
                   onDragEnd={(e) => handleDragEnd(shape.id, e)}
                   onTransformEnd={(e) => handleTransformEnd(shape.id, e)}
+                  shapeRef={shapeRef}
                 />
               );
             } else if (shape.type === 'line') {
               return (
-                <Line
+                <MemoizedLine
                   key={shape.id}
-                  ref={(node) => {
-                    if (node) {
-                      shapeRefs.current.set(shape.id, node);
-                    }
-                  }}
+                  id={shape.id}
                   x={shape.x}
                   y={shape.y}
-                  points={shape.points || []}
-                  stroke={shape.color}
-                  strokeWidth={2}
-                  hitStrokeWidth={20}
-                  tension={0.5}
-                  lineCap="round"
-                  lineJoin="round"
-                  draggable={tool === 'select' && canEdit}
+                  points={shape.points}
+                  color={shape.color}
+                  rotation={shape.rotation}
+                  scaleX={shape.scaleX}
+                  scaleY={shape.scaleY}
+                  isSelected={isSelected}
+                  canEdit={canEdit}
+                  tool={tool}
                   onClick={() => handleShapeClick(shape.id)}
-                  onTap={() => handleShapeClick(shape.id)}
                   onDragEnd={(e) => handleDragEnd(shape.id, e)}
+                  onTransformEnd={(e) => handleTransformEnd(shape.id, e)}
+                  shapeRef={shapeRef}
                 />
               );
             } else if (shape.type === 'text') {
@@ -1336,36 +1333,24 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
                 return null;
               }
               return (
-                <Text
+                <MemoizedText
                   key={shape.id}
-                  ref={(node) => {
-                    if (node) {
-                      shapeRefs.current.set(shape.id, node);
-                    }
-                  }}
+                  id={shape.id}
                   x={shape.x}
                   y={shape.y}
-                  text={shape.text || 'Double-click to edit'}
-                  fontSize={shape.fontSize || 20}
-                  fill={shape.color}
-                  width={shape.width || 200}
-                  wrap="word"
-                  align="left"
-                  stroke={selectedIds.has(shape.id) ? '#6366F1' : undefined}
-                  strokeWidth={selectedIds.has(shape.id) ? 1 : 0}
-                  shadowColor={selectedIds.has(shape.id) ? '#6366F1' : undefined}
-                  shadowBlur={selectedIds.has(shape.id) ? 8 : 0}
-                  shadowOpacity={selectedIds.has(shape.id) ? 0.3 : 0}
-                  rotation={shape.rotation || 0}
-                  scaleX={1}
-                  scaleY={1}
-                  draggable={tool === 'select' && canEdit}
+                  text={shape.text}
+                  fontSize={shape.fontSize}
+                  width={shape.width}
+                  color={shape.color}
+                  rotation={shape.rotation}
+                  isSelected={isSelected}
+                  canEdit={canEdit}
+                  tool={tool}
                   onClick={() => handleShapeClick(shape.id)}
-                  onTap={() => handleShapeClick(shape.id)}
                   onDblClick={() => handleTextDoubleClick(shape.id)}
-                  onDblTap={() => handleTextDoubleClick(shape.id)}
                   onDragEnd={(e) => handleDragEnd(shape.id, e)}
                   onTransformEnd={(e) => handleTransformEnd(shape.id, e)}
+                  shapeRef={shapeRef}
                 />
               );
             }

@@ -18,7 +18,8 @@
       "Bash(lsof:*)",
       "Bash(xargs kill:*)",
       "Bash(xargs:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(npm run build:*)"
     ]
   }
 }
