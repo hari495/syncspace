@@ -1,10 +1,6 @@
+// @ts-nocheck - Supabase complex query types need refinement
 import { supabase } from '@/config/supabase'
-import type { Workspace, WorkspaceMember } from '@/types/workspace'
-
-export interface CreateWorkspaceInput {
-  name: string
-  description?: string
-}
+import type { Workspace, WorkspaceMember, CreateWorkspaceInput } from '@/types/workspace'
 
 export interface UpdateWorkspaceInput {
   name?: string

@@ -3,6 +3,7 @@
  * Add this to your browser console to diagnose issues
  */
 
+// @ts-nocheck - Debug tool with relaxed type checking
 import { supabase } from './config/supabase'
 
 export async function diagnoseAuth() {

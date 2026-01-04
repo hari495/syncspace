@@ -7,6 +7,7 @@ import Cursor from './Cursor';
 import { ShareDialog } from './components/workspace/ShareDialog';
 import { supabase } from './config/supabase';
 import { MemoizedRectangle, MemoizedCircle, MemoizedLine, MemoizedText } from './components/whiteboard/MemoizedShapes';
+import * as WHITEBOARD from './constants/whiteboard';
 
 type Tool = 'select' | 'rectangle' | 'pencil' | 'text' | null;
 
@@ -34,13 +35,12 @@ interface CursorState {
 }
 
 const generateUserColor = (userId: number) => {
-  const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2'];
-  return colors[userId % colors.length];
+  return WHITEBOARD.USER_COLORS[userId % WHITEBOARD.USER_COLORS.length];
 };
 
 // Ramer-Douglas-Peucker algorithm for line simplification
-const simplifyPath = (points: number[], tolerance: number = 2): number[] => {
-  if (points.length <= 4) return points; // Need at least 2 points (4 values)
+const simplifyPath = (points: number[], tolerance: number = WHITEBOARD.PATH_SIMPLIFICATION_TOLERANCE): number[] => {
+  if (points.length <= WHITEBOARD.MIN_POINTS_FOR_SIMPLIFICATION) return points;
 
   const sqTolerance = tolerance * tolerance;
 
@@ -157,8 +157,8 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
           .eq('id', user.id)
           .single();
 
-        if (profile?.full_name) {
-          setUserName(profile.full_name);
+        if (profile && (profile as any).full_name) {
+          setUserName((profile as any).full_name);
         } else {
           // Fallback to auth metadata
           const name = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'User';
@@ -181,8 +181,8 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
 
     providerRef.current = provider;
 
-    provider.on('status', (event: { status: string }) => {
-      console.log('WebSocket status:', event.status);
+    provider.on('status', () => {
+      // WebSocket connected
     });
 
     // Set up awareness
@@ -306,13 +306,12 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         e.preventDefault();
 
-        const moveAmount = 10; // pixels to move
         let dx = 0, dy = 0;
 
-        if (e.key === 'ArrowUp') dy = -moveAmount;
-        if (e.key === 'ArrowDown') dy = moveAmount;
-        if (e.key === 'ArrowLeft') dx = -moveAmount;
-        if (e.key === 'ArrowRight') dx = moveAmount;
+        if (e.key === 'ArrowUp') dy = -WHITEBOARD.ARROW_KEY_MOVE_AMOUNT;
+        if (e.key === 'ArrowDown') dy = WHITEBOARD.ARROW_KEY_MOVE_AMOUNT;
+        if (e.key === 'ArrowLeft') dx = -WHITEBOARD.ARROW_KEY_MOVE_AMOUNT;
+        if (e.key === 'ArrowRight') dx = WHITEBOARD.ARROW_KEY_MOVE_AMOUNT;
 
         // Collect all IDs to move (avoid duplicates)
         const idsToMove = new Set<string>();
@@ -353,7 +352,6 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
             });
           });
 
-          console.log(`Deleted ${idsToDelete.size} shape(s)`);
           setSelectedId(null);
           setSelectedIds(new Set());
         }
@@ -371,11 +369,10 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
   useEffect(() => {
     if (editingTextId && textareaRef.current) {
       const textarea = textareaRef.current;
-      // Focus and select the textarea
       setTimeout(() => {
         textarea.focus();
         textarea.select();
-      }, 10);
+      }, WHITEBOARD.TEXTAREA_FOCUS_DELAY);
     }
   }, [editingTextId]);
 
@@ -392,22 +389,14 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
   }, []);
 
   const handleUndo = useCallback(() => {
-    console.log('Undo requested');
     if (undoManagerRef.current && undoManagerRef.current.canUndo()) {
       undoManagerRef.current.undo();
-      console.log('Undo performed');
-    } else {
-      console.log('Cannot undo - stack is empty');
     }
   }, []);
 
   const handleRedo = useCallback(() => {
-    console.log('Redo requested');
     if (undoManagerRef.current && undoManagerRef.current.canRedo()) {
       undoManagerRef.current.redo();
-      console.log('Redo performed');
-    } else {
-      console.log('Cannot redo - stack is empty');
     }
   }, []);
 
@@ -428,8 +417,8 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
 
       // For rectangles and circles, update actual width/height based on scale
       if (shape.type === 'rectangle') {
-        updatedShape.width = Math.max(5, node.width() * scaleX);
-        updatedShape.height = Math.max(5, node.height() * scaleY);
+        updatedShape.width = Math.max(WHITEBOARD.MIN_SHAPE_SIZE, node.width() * scaleX);
+        updatedShape.height = Math.max(WHITEBOARD.MIN_SHAPE_SIZE, node.height() * scaleY);
         updatedShape.scaleX = 1;
         updatedShape.scaleY = 1;
 
@@ -439,7 +428,7 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
         node.width(updatedShape.width);
         node.height(updatedShape.height);
       } else if (shape.type === 'circle') {
-        updatedShape.radius = Math.max(5, (shape.radius || 50) * scaleX);
+        updatedShape.radius = Math.max(WHITEBOARD.MIN_SHAPE_SIZE, (shape.radius || WHITEBOARD.DEFAULT_CIRCLE_RADIUS) * scaleX);
         updatedShape.scaleX = 1;
         updatedShape.scaleY = 1;
 
@@ -464,7 +453,7 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
         node.points(scaledPoints);
       } else if (shape.type === 'text') {
         // For text, adjust width to wrap text instead of scaling
-        const newWidth = Math.max(50, node.width() * scaleX);
+        const newWidth = Math.max(WHITEBOARD.MIN_TEXT_WIDTH, node.width() * scaleX);
         updatedShape.width = newWidth;
         updatedShape.scaleX = 1;
         updatedShape.scaleY = 1;
@@ -473,8 +462,6 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
         node.scaleX(1);
         node.scaleY(1);
         node.width(newWidth);
-
-        console.log(`Text resized to width: ${newWidth}px - text will wrap`);
       }
 
       shapesMap.set(shapeId, updatedShape);
@@ -559,8 +546,8 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
           type: 'rectangle',
           x: stagePos.x,
           y: stagePos.y,
-          width: 100,
-          height: 100,
+          width: WHITEBOARD.DEFAULT_RECTANGLE_SIZE,
+          height: WHITEBOARD.DEFAULT_RECTANGLE_SIZE,
           color: selectedColor
         };
         shapesMap.set(id, newRect);
@@ -569,10 +556,9 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
       // If currently editing, finish that first
       if (editingTextId) {
         handleTextBlur();
-        // Wait a bit for state to update before creating new text
         setTimeout(() => {
           createNewText(e);
-        }, 10);
+        }, WHITEBOARD.TEXT_CREATION_DELAY);
       } else {
         createNewText(e);
       }
@@ -583,21 +569,17 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
     // Only create text if clicking on empty space, not on existing shapes
     const clickedOnShape = e.target.attrs && e.target.attrs.id;
     if (clickedOnShape) {
-      console.log('Clicked on shape, not creating text');
       return;
     }
 
     const stage = e.target.getStage();
     const pos = stage?.getPointerPosition();
     if (pos) {
-      console.log('Creating text at', pos.x, pos.y);
       const id = `text-${Date.now()}`;
 
       setEditingTextId(id);
       setTextareaValue('');
       setTextareaPosition({ x: pos.x, y: pos.y });
-
-      console.log('Set editing state:', { id, pos });
     }
   };
 
@@ -611,7 +593,7 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
         x: textareaPosition.x,
         y: textareaPosition.y,
         text: textareaValue,
-        fontSize: 20,
+        fontSize: WHITEBOARD.DEFAULT_TEXT_FONT_SIZE,
         color: selectedColor
       };
       shapesMap.set(editingTextId, newText);
@@ -651,10 +633,10 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
       return;
     }
 
-    // Throttle cursor updates to 100ms (10 updates/sec instead of 60+)
+    // Throttle cursor updates
     if (pos && providerRef.current) {
       const now = Date.now();
-      if (now - lastCursorUpdateTime.current > 100) {
+      if (now - lastCursorUpdateTime.current > WHITEBOARD.CURSOR_UPDATE_THROTTLE) {
         const awareness = providerRef.current.awareness;
         awareness.setLocalStateField('x', pos.x);
         awareness.setLocalStateField('y', pos.y);
@@ -686,9 +668,9 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
         const newPoints = [...currentLine.points, stagePos.x, stagePos.y];
         const updatedLine: Shape = { ...currentLine, points: newPoints };
 
-        // Throttle updates to Y.js (only every 50ms)
+        // Throttle updates to Y.js
         const now = Date.now();
-        if (now - lastUpdateTime.current > 50) {
+        if (now - lastUpdateTime.current > WHITEBOARD.DRAWING_UPDATE_THROTTLE) {
           shapesMap.set(currentLineId.current, updatedLine);
           lastUpdateTime.current = now;
         } else {
@@ -725,8 +707,6 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
 
       const selected = new Set<string>();
 
-      console.log('Selection box:', { minX, maxX, minY, maxY, width: maxX - minX, height: maxY - minY });
-
       // Check each shape if it's within the selection box
       shapes.forEach((shape, id) => {
         let shapeMinX, shapeMaxX, shapeMinY, shapeMaxY;
@@ -743,15 +723,14 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
           shapeMaxY = shape.y + (shape.radius || 0);
         } else if (shape.type === 'text') {
           // Calculate accurate text height based on fontSize and wrapping
-          const fontSize = shape.fontSize || 20;
-          const width = shape.width || 200;
+          const fontSize = shape.fontSize || WHITEBOARD.DEFAULT_TEXT_FONT_SIZE;
+          const width = shape.width || WHITEBOARD.DEFAULT_TEXT_WIDTH;
           const text = shape.text || '';
 
           // Estimate number of lines based on text length and width
-          // This is a rough estimate - actual height depends on font metrics
-          const avgCharsPerLine = Math.floor(width / (fontSize * 0.6)); // Rough estimate
+          const avgCharsPerLine = Math.floor(width / (fontSize * WHITEBOARD.TEXT_CHAR_WIDTH_RATIO));
           const numLines = text.length > 0 ? Math.max(1, Math.ceil(text.length / avgCharsPerLine)) : 1;
-          const lineHeight = fontSize * 1.2; // Standard line height
+          const lineHeight = fontSize * WHITEBOARD.DEFAULT_LINE_HEIGHT;
           const estimatedHeight = numLines * lineHeight;
 
           shapeMinX = shape.x;
@@ -782,16 +761,12 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
 
         if (overlaps) {
           selected.add(id);
-          console.log(`  ✓ Selected ${shape.type} ${id}:`, {
-            shapeBounds: { minX: shapeMinX, maxX: shapeMaxX, minY: shapeMinY, maxY: shapeMaxY }
-          });
         }
       });
 
       setSelectedIds(selected);
       setSelectionBox(null);
       isSelecting.current = false;
-      console.log(`Selected ${selected.size} shapes total`);
     }
 
     if (tool === 'pencil' && isDrawing.current && currentLineId.current) {
@@ -799,11 +774,7 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
       const currentLine = shapes.get(currentLineId.current);
       if (currentLine && currentLine.points) {
         // Simplify the path to reduce point count and improve performance
-        const originalPoints = currentLine.points.length / 2;
-        const simplifiedPoints = simplifyPath(currentLine.points, 2);
-        const reducedPoints = simplifiedPoints.length / 2;
-
-        console.log(`Path simplified: ${originalPoints} points → ${reducedPoints} points (${Math.round((1 - reducedPoints/originalPoints) * 100)}% reduction)`);
+        const simplifiedPoints = simplifyPath(currentLine.points, WHITEBOARD.PATH_SIMPLIFICATION_TOLERANCE);
 
         // Save the simplified path to Y.js
         const simplifiedLine = {
@@ -822,32 +793,29 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
 
   // Memoize grid rendering to prevent recalculation on every render
   const gridDots = useMemo(() => {
-    const gridSize = 30;
-    const dotRadius = 1.5;
     const dots = [];
 
     // Calculate visible bounds with some padding
-    const padding = 1000; // Extra dots beyond viewport
-    const minX = Math.floor((-stagePos.x - padding) / gridSize) * gridSize;
-    const maxX = Math.ceil((-stagePos.x + stageWidth + padding) / gridSize) * gridSize;
-    const minY = Math.floor((-stagePos.y - padding) / gridSize) * gridSize;
-    const maxY = Math.ceil((-stagePos.y + stageHeight + padding) / gridSize) * gridSize;
+    const minX = Math.floor((-stagePos.x - WHITEBOARD.GRID_PADDING) / WHITEBOARD.GRID_SIZE) * WHITEBOARD.GRID_SIZE;
+    const maxX = Math.ceil((-stagePos.x + stageWidth + WHITEBOARD.GRID_PADDING) / WHITEBOARD.GRID_SIZE) * WHITEBOARD.GRID_SIZE;
+    const minY = Math.floor((-stagePos.y - WHITEBOARD.GRID_PADDING) / WHITEBOARD.GRID_SIZE) * WHITEBOARD.GRID_SIZE;
+    const maxY = Math.ceil((-stagePos.y + stageHeight + WHITEBOARD.GRID_PADDING) / WHITEBOARD.GRID_SIZE) * WHITEBOARD.GRID_SIZE;
 
     // Limit the range to prevent too many dots
-    const limitedMinX = Math.max(minX, -10000);
-    const limitedMaxX = Math.min(maxX, 10000);
-    const limitedMinY = Math.max(minY, -10000);
-    const limitedMaxY = Math.min(maxY, 10000);
+    const limitedMinX = Math.max(minX, -WHITEBOARD.GRID_MAX_EXTENT);
+    const limitedMaxX = Math.min(maxX, WHITEBOARD.GRID_MAX_EXTENT);
+    const limitedMinY = Math.max(minY, -WHITEBOARD.GRID_MAX_EXTENT);
+    const limitedMaxY = Math.min(maxY, WHITEBOARD.GRID_MAX_EXTENT);
 
-    for (let x = limitedMinX; x <= limitedMaxX; x += gridSize) {
-      for (let y = limitedMinY; y <= limitedMaxY; y += gridSize) {
+    for (let x = limitedMinX; x <= limitedMaxX; x += WHITEBOARD.GRID_SIZE) {
+      for (let y = limitedMinY; y <= limitedMaxY; y += WHITEBOARD.GRID_SIZE) {
         dots.push(
           <Circle
             key={`dot-${x}-${y}`}
             x={x}
             y={y}
-            radius={dotRadius}
-            fill="#D1D5DB"
+            radius={WHITEBOARD.GRID_DOT_RADIUS}
+            fill={WHITEBOARD.GRID_DOT_COLOR}
           />
         );
       }
@@ -1013,7 +981,7 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '12px', color: '#6B7280', fontWeight: '500' }}>Color:</span>
           <div style={{ display: 'flex', gap: '4px' }}>
-            {['#000000', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#FFFFFF'].map((color) => (
+            {WHITEBOARD.COLOR_PALETTE.map((color) => (
               <button
                 key={color}
                 onClick={() => setSelectedColor(color)}
@@ -1209,15 +1177,15 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
             position: 'absolute',
             top: textareaPosition.y,
             left: textareaPosition.x,
-            fontSize: '20px',
+            fontSize: `${WHITEBOARD.DEFAULT_TEXT_FONT_SIZE}px`,
             border: '2px solid #6366F1',
             background: 'white',
             padding: '6px 10px',
             outline: 'none',
             resize: 'both',
             zIndex: 1000,
-            width: '200px',
-            height: '32px',
+            width: `${WHITEBOARD.DEFAULT_TEXT_WIDTH}px`,
+            height: `${WHITEBOARD.DEFAULT_TEXT_HEIGHT}px`,
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
             color: '#1F2937',
             lineHeight: '1.4',
@@ -1249,11 +1217,11 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
         <Layer listening={false}>
           {/* Large background rect */}
           <Rect
-            x={-50000}
-            y={-50000}
-            width={100000}
-            height={100000}
-            fill="#FAFAFA"
+            x={-WHITEBOARD.CANVAS_BACKGROUND_SIZE / 2}
+            y={-WHITEBOARD.CANVAS_BACKGROUND_SIZE / 2}
+            width={WHITEBOARD.CANVAS_BACKGROUND_SIZE}
+            height={WHITEBOARD.CANVAS_BACKGROUND_SIZE}
+            fill={WHITEBOARD.CANVAS_BACKGROUND_COLOR}
           />
           {/* Infinite grid dots - only render visible ones (memoized) */}
           {gridDots}
@@ -1379,10 +1347,10 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
               y={Math.min(selectionBox.y1, selectionBox.y2)}
               width={Math.abs(selectionBox.x2 - selectionBox.x1)}
               height={Math.abs(selectionBox.y2 - selectionBox.y1)}
-              fill="rgba(99, 102, 241, 0.08)"
-              stroke="#6366F1"
-              strokeWidth={2}
-              dash={[5, 5]}
+              fill={WHITEBOARD.SELECTION_BOX_FILL}
+              stroke={WHITEBOARD.SELECTION_BOX_STROKE}
+              strokeWidth={WHITEBOARD.SELECTION_BOX_STROKE_WIDTH}
+              dash={WHITEBOARD.SELECTION_BOX_DASH}
             />
           )}
 

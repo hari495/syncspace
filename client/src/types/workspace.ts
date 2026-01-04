@@ -9,7 +9,7 @@ export interface WorkspaceMember {
   id: string
   workspace_id: string
   user_id: string
-  role: 'owner' | 'editor' | 'viewer'
+  role: 'owner' | 'editor' | 'viewer' | 'member'
   joined_at: string
   profiles?: Profile
 }
@@ -25,7 +25,7 @@ export interface Workspace {
 }
 
 export interface WorkspaceWithRole extends Workspace {
-  role: 'owner' | 'editor' | 'viewer'
+  role: 'owner' | 'editor' | 'viewer' | 'member'
 }
 
 export interface InviteToken {

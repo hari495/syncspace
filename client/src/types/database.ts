@@ -66,21 +66,21 @@ export interface Database {
           id: string
           workspace_id: string
           user_id: string
-          role: 'owner' | 'editor' | 'viewer'
+          role: 'owner' | 'editor' | 'viewer' | 'member'
           joined_at: string
         }
         Insert: {
           id?: string
           workspace_id: string
           user_id: string
-          role?: 'owner' | 'editor' | 'viewer'
+          role?: 'owner' | 'editor' | 'viewer' | 'member'
           joined_at?: string
         }
         Update: {
           id?: string
           workspace_id?: string
           user_id?: string
-          role?: 'owner' | 'editor' | 'viewer'
+          role?: 'owner' | 'editor' | 'viewer' | 'member'
           joined_at?: string
         }
       }

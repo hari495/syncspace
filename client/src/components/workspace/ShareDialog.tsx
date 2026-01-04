@@ -1,4 +1,5 @@
 import { useState, useEffect, memo } from 'react'
+import { toast } from 'sonner'
 import {
   Dialog,
   DialogContent,
@@ -10,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createInviteToken, getWorkspaceMembers, removeMember, updateMemberRole } from '@/lib/workspaces'
-import { Share2, Copy, Check, UserMinus, User, ChevronDown } from 'lucide-react'
+import { Share2, Copy, Check, UserMinus, User } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import type { WorkspaceMember } from '@/types/workspace'
 
@@ -50,38 +51,31 @@ export const ShareDialog = memo(function ShareDialog({ workspaceId, workspaceNam
   }
 
   const handleRemoveMember = async (memberId: string, userId: string) => {
-    console.log('Attempting to remove member:', { memberId, userId, workspaceId })
-
     if (!confirm('Are you sure you want to remove this member?')) {
       return
     }
 
     setRemovingMemberId(memberId)
     try {
-      console.log('Calling removeMember API...')
       await removeMember(workspaceId, userId)
-      console.log('Member removed successfully')
-      // Refresh members list
       await loadMembers()
+      toast.success('Member removed successfully')
     } catch (error) {
       console.error('Failed to remove member:', error)
-      alert(`Failed to remove member: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      toast.error(`Failed to remove member: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setRemovingMemberId(null)
     }
   }
 
   const handleRoleChange = async (userId: string, newRole: string) => {
-    console.log('Attempting to change role:', { userId, newRole, workspaceId })
-
     try {
       await updateMemberRole(workspaceId, userId, newRole as any)
-      console.log('Role updated successfully')
-      // Refresh members list
       await loadMembers()
+      toast.success('Role updated successfully')
     } catch (error) {
       console.error('Failed to update role:', error)
-      alert(`Failed to update role: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      toast.error(`Failed to update role: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
@@ -92,9 +86,10 @@ export const ShareDialog = memo(function ShareDialog({ workspaceId, workspaceNam
       const baseUrl = window.location.origin
       const link = `${baseUrl}/invite/${token}`
       setInviteLink(link)
+      toast.success('Invite link generated successfully')
     } catch (error) {
       console.error('Failed to generate invite link:', error)
-      alert('Failed to generate invite link. Please try again.')
+      toast.error('Failed to generate invite link. Please try again.')
     } finally {
       setIsGenerating(false)
     }
@@ -105,19 +100,11 @@ export const ShareDialog = memo(function ShareDialog({ workspaceId, workspaceNam
       await navigator.clipboard.writeText(inviteLink)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
+      toast.success('Link copied to clipboard')
     } catch (error) {
       console.error('Failed to copy:', error)
+      toast.error('Failed to copy link')
     }
-  }
-
-  const getInitials = (name?: string, email?: string) => {
-    if (name) {
-      return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-    }
-    if (email) {
-      return email[0].toUpperCase()
-    }
-    return 'U'
   }
 
   return (
@@ -150,16 +137,6 @@ export const ShareDialog = memo(function ShareDialog({ workspaceId, workspaceNam
                   const currentUserMember = members.find(m => m.user_id === user?.id)
                   const canRemove = !isOwner && currentUserMember?.role === 'owner'
 
-                  // Debug logging
-                  if (isCurrentUser) {
-                    console.log('Current user member:', {
-                      name: member.user?.full_name,
-                      role: member.role,
-                      isOwner,
-                      currentUserRole: currentUserMember?.role
-                    })
-                  }
-
                   return (
                     <div
                       key={member.id}
@@ -168,10 +145,10 @@ export const ShareDialog = memo(function ShareDialog({ workspaceId, workspaceNam
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         {/* Avatar */}
                         <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-semibold">
-                          {member.user?.avatar_url ? (
+                          {member.profiles?.avatar_url ? (
                             <img
-                              src={member.user.avatar_url}
-                              alt={member.user.full_name || member.user.email}
+                              src={member.profiles.avatar_url}
+                              alt={member.profiles.full_name || member.profiles.email}
                               className="w-10 h-10 rounded-full"
                             />
                           ) : (
@@ -183,7 +160,7 @@ export const ShareDialog = memo(function ShareDialog({ workspaceId, workspaceNam
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-medium truncate">
-                              {member.user?.full_name || member.user?.email}
+                              {member.profiles?.full_name || member.profiles?.email}
                             </p>
                             {isCurrentUser && (
                               <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
@@ -191,9 +168,9 @@ export const ShareDialog = memo(function ShareDialog({ workspaceId, workspaceNam
                               </span>
                             )}
                           </div>
-                          {member.user?.email && member.user?.full_name && (
+                          {member.profiles?.email && member.profiles?.full_name && (
                             <p className="text-xs text-muted-foreground truncate">
-                              {member.user.email}
+                              {member.profiles.email}
                             </p>
                           )}
                         </div>
@@ -227,10 +204,7 @@ export const ShareDialog = memo(function ShareDialog({ workspaceId, workspaceNam
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8 hover:bg-destructive/10"
-                              onClick={() => {
-                                console.log('Remove button clicked for:', member.user?.full_name || member.user?.email)
-                                handleRemoveMember(member.id, member.user_id)
-                              }}
+                              onClick={() => handleRemoveMember(member.id, member.user_id)}
                               disabled={removingMemberId === member.id}
                               title="Remove member"
                             >

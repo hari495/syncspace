@@ -7,9 +7,9 @@ import {
   deleteWorkspace,
   getWorkspaceMembers,
   removeMember,
-  type CreateWorkspaceInput,
   type UpdateWorkspaceInput,
 } from '@/lib/workspaces'
+import type { CreateWorkspaceInput } from '@/types/workspace'
 
 export function useWorkspaces() {
   return useQuery({

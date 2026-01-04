@@ -63,7 +63,6 @@ export function DashboardPage() {
                   const ws = workspaces.find((w) => w.id === id)
                   if (ws) setWorkspaceToDelete(ws)
                 }}
-                onSettings={() => {/* TODO: Implement settings */}}
               />
             ))}
           </div>

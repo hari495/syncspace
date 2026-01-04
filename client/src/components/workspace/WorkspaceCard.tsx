@@ -1,17 +1,16 @@
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Trash2, Settings, Users } from 'lucide-react'
+import { Trash2, Users } from 'lucide-react'
 import type { Workspace } from '@/types/workspace'
 import { formatDistanceToNow } from 'date-fns'
 
 interface WorkspaceCardProps {
   workspace: Workspace
   onDelete: (id: string) => void
-  onSettings: (workspace: Workspace) => void
 }
 
-export function WorkspaceCard({ workspace, onDelete, onSettings }: WorkspaceCardProps) {
+export function WorkspaceCard({ workspace, onDelete }: WorkspaceCardProps) {
   const navigate = useNavigate()
 
   const isOwner = workspace.workspace_members?.some(
@@ -37,30 +36,17 @@ export function WorkspaceCard({ workspace, onDelete, onSettings }: WorkspaceCard
           </div>
           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             {isOwner && (
-              <>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onSettings(workspace)
-                  }}
-                >
-                  <Settings className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-destructive hover:text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onDelete(workspace.id)
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-destructive hover:text-destructive"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete(workspace.id)
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             )}
           </div>
         </div>
