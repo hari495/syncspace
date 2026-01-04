@@ -108,9 +108,13 @@ interface WhiteboardProps {
   roomName?: string;
   workspaceId?: string;
   workspaceName?: string;
+  userRole?: string;
 }
 
-export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspaceName }: WhiteboardProps) => {
+export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspaceName, userRole = 'editor' }: WhiteboardProps) => {
+  const isViewer = userRole === 'viewer';
+  const canEdit = !isViewer;
+
   const [shapes, setShapes] = useState<Map<string, Shape>>(new Map());
   const [remoteCursors, setRemoteCursors] = useState<Map<number, CursorState>>(new Map());
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -463,6 +467,11 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
 
   const handleMouseDown = (e: any) => {
     const stage = e.target.getStage();
+
+    // Viewers can only pan, not draw or edit
+    if (isViewer) {
+      return;
+    }
 
     // Handle panning with space bar or middle mouse button
     if (e.evt.button === 1 || e.evt.spaceKey) {
@@ -826,11 +835,16 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
         {/* Tool Selection */}
         <div style={{ display: 'flex', gap: '6px' }}>
           <button
-            onClick={() => setTool(tool === 'select' ? null : 'select')}
-            style={getToolButtonStyle(tool === 'select')}
-            title="Select Tool (V) - Click again to pan"
+            onClick={() => !isViewer && setTool(tool === 'select' ? null : 'select')}
+            style={{
+              ...getToolButtonStyle(tool === 'select'),
+              opacity: isViewer ? 0.5 : 1,
+              cursor: isViewer ? 'not-allowed' : 'pointer'
+            }}
+            title={isViewer ? "View only - editing disabled" : "Select Tool (V) - Click again to pan"}
+            disabled={isViewer}
             onMouseEnter={(e) => {
-              if (tool !== 'select') {
+              if (tool !== 'select' && !isViewer) {
                 e.currentTarget.style.backgroundColor = '#F3F4F6';
               }
             }}
@@ -844,9 +858,14 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
             <span>Select</span>
           </button>
           <button
-            onClick={() => setTool('rectangle')}
-            style={getToolButtonStyle(tool === 'rectangle')}
-            title="Rectangle Tool (R)"
+            onClick={() => !isViewer && setTool('rectangle')}
+            style={{
+              ...getToolButtonStyle(tool === 'rectangle'),
+              opacity: isViewer ? 0.5 : 1,
+              cursor: isViewer ? 'not-allowed' : 'pointer'
+            }}
+            title={isViewer ? "View only - editing disabled" : "Rectangle Tool (R)"}
+            disabled={isViewer}
             onMouseEnter={(e) => {
               if (tool !== 'rectangle') {
                 e.currentTarget.style.backgroundColor = '#F3F4F6';
@@ -862,11 +881,16 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
             <span>Rectangle</span>
           </button>
           <button
-            onClick={() => setTool('pencil')}
-            style={getToolButtonStyle(tool === 'pencil')}
-            title="Pencil Tool (P)"
+            onClick={() => !isViewer && setTool('pencil')}
+            style={{
+              ...getToolButtonStyle(tool === 'pencil'),
+              opacity: isViewer ? 0.5 : 1,
+              cursor: isViewer ? 'not-allowed' : 'pointer'
+            }}
+            title={isViewer ? "View only - editing disabled" : "Pencil Tool (P)"}
+            disabled={isViewer}
             onMouseEnter={(e) => {
-              if (tool !== 'pencil') {
+              if (tool !== 'pencil' && !isViewer) {
                 e.currentTarget.style.backgroundColor = '#F3F4F6';
               }
             }}
@@ -881,6 +905,7 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
           </button>
           <button
             onClick={() => {
+              if (isViewer) return;
               setTool('text');
               const centerX = window.innerWidth / 2;
               const centerY = window.innerHeight / 2;
@@ -889,10 +914,15 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
               setTextareaValue('');
               setTextareaPosition({ x: centerX, y: centerY });
             }}
-            style={getToolButtonStyle(tool === 'text')}
-            title="Text Tool (T)"
+            style={{
+              ...getToolButtonStyle(tool === 'text'),
+              opacity: isViewer ? 0.5 : 1,
+              cursor: isViewer ? 'not-allowed' : 'pointer'
+            }}
+            title={isViewer ? "View only - editing disabled" : "Text Tool (T)"}
+            disabled={isViewer}
             onMouseEnter={(e) => {
-              if (tool !== 'text') {
+              if (tool !== 'text' && !isViewer) {
                 e.currentTarget.style.backgroundColor = '#F3F4F6';
               }
             }}
@@ -908,11 +938,12 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
         </div>
 
         {/* Divider */}
-        <div style={{ width: '1px', backgroundColor: '#E5E7EB', margin: '0 4px' }} />
+        {!isViewer && <div style={{ width: '1px', backgroundColor: '#E5E7EB', margin: '0 4px' }} />}
 
-        {/* Color Picker */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '12px', color: '#6B7280', fontWeight: '500' }}>Color:</span>
+        {/* Color Picker - Hide for viewers */}
+        {!isViewer && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '12px', color: '#6B7280', fontWeight: '500' }}>Color:</span>
           <div style={{ display: 'flex', gap: '4px' }}>
             {['#000000', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#FFFFFF'].map((color) => (
               <button
@@ -947,9 +978,10 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
             />
           </div>
         </div>
+        )}
 
         {/* Divider */}
-        <div style={{ width: '1px', backgroundColor: '#E5E7EB', margin: '0 4px' }} />
+        {!isViewer && <div style={{ width: '1px', backgroundColor: '#E5E7EB', margin: '0 4px' }} />}
 
         {/* Undo/Redo */}
         <div style={{ display: 'flex', gap: '6px' }}>
@@ -1213,7 +1245,7 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
                   rotation={shape.rotation || 0}
                   scaleX={shape.scaleX || 1}
                   scaleY={shape.scaleY || 1}
-                  draggable={tool === 'select'}
+                  draggable={tool === 'select' && canEdit}
                   onClick={() => handleShapeClick(shape.id)}
                   onTap={() => handleShapeClick(shape.id)}
                   onDragEnd={(e) => handleDragEnd(shape.id, e)}
@@ -1238,7 +1270,7 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
                   rotation={shape.rotation || 0}
                   scaleX={shape.scaleX || 1}
                   scaleY={shape.scaleY || 1}
-                  draggable={tool === 'select'}
+                  draggable={tool === 'select' && canEdit}
                   onClick={() => handleShapeClick(shape.id)}
                   onTap={() => handleShapeClick(shape.id)}
                   onDragEnd={(e) => handleDragEnd(shape.id, e)}
@@ -1263,7 +1295,7 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
                   tension={0.5}
                   lineCap="round"
                   lineJoin="round"
-                  draggable={tool === 'select'}
+                  draggable={tool === 'select' && canEdit}
                   onClick={() => handleShapeClick(shape.id)}
                   onTap={() => handleShapeClick(shape.id)}
                   onDragEnd={(e) => handleDragEnd(shape.id, e)}
@@ -1298,7 +1330,7 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
                   rotation={shape.rotation || 0}
                   scaleX={1}
                   scaleY={1}
-                  draggable={tool === 'select'}
+                  draggable={tool === 'select' && canEdit}
                   onClick={() => handleShapeClick(shape.id)}
                   onTap={() => handleShapeClick(shape.id)}
                   onDblClick={() => handleTextDoubleClick(shape.id)}

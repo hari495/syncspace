@@ -1,12 +1,14 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useWorkspace } from '@/hooks/useWorkspaces'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Users, Settings } from 'lucide-react'
+import { ArrowLeft, Users, Settings, Eye } from 'lucide-react'
 import { Whiteboard } from '../Whiteboard'
+import { useAuth } from '@/hooks/useAuth'
 
 export function WorkspacePage() {
   const { workspaceId } = useParams<{ workspaceId: string }>()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const { data: workspace, isLoading, error } = useWorkspace(workspaceId!)
 
   if (isLoading) {
@@ -39,6 +41,13 @@ export function WorkspacePage() {
 
   const memberCount = workspace.workspace_members?.length || 0
 
+  // Get current user's role
+  const currentMember = workspace.workspace_members?.find(
+    (member) => member.user_id === user?.id
+  )
+  const userRole = currentMember?.role || 'viewer'
+  const isViewer = userRole === 'viewer'
+
   return (
     <div className="flex h-screen flex-col">
       {/* Header */}
@@ -53,7 +62,15 @@ export function WorkspacePage() {
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-lg font-semibold">{workspace.name}</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-semibold">{workspace.name}</h1>
+                {isViewer && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 text-xs font-medium">
+                    <Eye className="h-3 w-3" />
+                    View Only
+                  </span>
+                )}
+              </div>
               {workspace.description && (
                 <p className="text-sm text-muted-foreground">
                   {workspace.description}
@@ -79,6 +96,7 @@ export function WorkspacePage() {
           roomName={`workspace-${workspaceId}`}
           workspaceId={workspaceId}
           workspaceName={workspace.name}
+          userRole={userRole}
         />
       </div>
     </div>
