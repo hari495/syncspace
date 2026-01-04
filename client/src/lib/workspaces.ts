@@ -12,10 +12,6 @@ export interface UpdateWorkspaceInput {
 }
 
 export async function getWorkspaces(): Promise<Workspace[]> {
-  console.log('Fetching workspaces...')
-  console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL)
-  console.log('Supabase Key exists:', !!import.meta.env.VITE_SUPABASE_ANON_KEY)
-
   const { data, error } = await supabase
     .from('workspaces')
     .select(`
@@ -27,11 +23,7 @@ export async function getWorkspaces(): Promise<Workspace[]> {
     `)
     .order('created_at', { ascending: false })
 
-  if (error) {
-    console.error('Error fetching workspaces:', error)
-    throw error
-  }
-  console.log('Workspaces fetched:', data?.length || 0)
+  if (error) throw error
   return data || []
 }
 
@@ -59,7 +51,6 @@ export async function getWorkspace(id: string): Promise<Workspace> {
 
   if (error) {
     // If the join syntax fails, fall back to simple query
-    console.warn('Failed with join, trying simple query:', error)
     const { data: simpleData, error: simpleError } = await supabase
       .from('workspaces')
       .select(`
@@ -144,8 +135,6 @@ export async function deleteWorkspace(id: string): Promise<void> {
 }
 
 export async function getWorkspaceMembers(workspaceId: string): Promise<WorkspaceMember[]> {
-  console.log('🔍 Fetching members for workspace:', workspaceId)
-
   // Try with explicit join syntax first
   const { data, error } = await supabase
     .from('workspace_members')
@@ -162,25 +151,17 @@ export async function getWorkspaceMembers(workspaceId: string): Promise<Workspac
     .order('joined_at', { ascending: true })
 
   if (error) {
-    console.error('❌ Join query failed:', error)
     // Fall back to simple query with separate profile fetch
-    console.log('⚠️ Falling back to separate queries...')
     const { data: members, error: membersError } = await supabase
       .from('workspace_members')
       .select('*')
       .eq('workspace_id', workspaceId)
       .order('joined_at', { ascending: true })
 
-    if (membersError) {
-      console.error('❌ Members query failed:', membersError)
-      throw membersError
-    }
-
-    console.log('✅ Found members:', members?.length || 0)
+    if (membersError) throw membersError
 
     if (members && members.length > 0) {
       const userIds = members.map(m => m.user_id)
-      console.log('🔍 Fetching profiles for user IDs:', userIds)
 
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
@@ -188,15 +169,12 @@ export async function getWorkspaceMembers(workspaceId: string): Promise<Workspac
         .in('id', userIds)
 
       if (profilesError) {
-        console.error('❌ Profiles query failed:', profilesError)
         // Return members without profiles
         return members.map(member => ({
           ...member,
           user: undefined
         })) as WorkspaceMember[]
       }
-
-      console.log('✅ Found profiles:', profiles?.length || 0)
 
       return members.map(member => ({
         ...member,
@@ -207,7 +185,6 @@ export async function getWorkspaceMembers(workspaceId: string): Promise<Workspac
     return members || []
   }
 
-  console.log('✅ Join query succeeded, found members:', data?.length || 0)
   return data || []
 }
 

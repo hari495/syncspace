@@ -17,7 +17,8 @@
       "Bash(node:*)",
       "Bash(lsof:*)",
       "Bash(xargs kill:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(git checkout:*)"
     ]
   }
 }

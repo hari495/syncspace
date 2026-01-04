@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -21,7 +21,7 @@ interface ShareDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-export function ShareDialog({ workspaceId, workspaceName, open, onOpenChange }: ShareDialogProps) {
+export const ShareDialog = memo(function ShareDialog({ workspaceId, workspaceName, open, onOpenChange }: ShareDialogProps) {
   const { user } = useAuth()
   const [inviteLink, setInviteLink] = useState<string>('')
   const [isGenerating, setIsGenerating] = useState(false)
@@ -305,4 +305,4 @@ export function ShareDialog({ workspaceId, workspaceName, open, onOpenChange }: 
       </DialogContent>
     </Dialog>
   )
-}
+})

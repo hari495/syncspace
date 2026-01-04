@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { Stage, Layer, Rect, Circle, Transformer, Line, Text } from 'react-konva';
 import Konva from 'konva';
 import * as Y from 'yjs';
@@ -140,6 +140,7 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
   const isPanning = useRef(false);
   const currentLineId = useRef<string | null>(null);
   const lastUpdateTime = useRef(0);
+  const lastCursorUpdateTime = useRef(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
 
@@ -212,18 +213,38 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
     undoManagerRef.current = undoManager;
 
     // Observe changes to the Y.Map and update React state
-    const observer = () => {
+    // Optimized: Use event changes to only update affected shapes
+    const observer = (event: Y.YMapEvent<any>) => {
+      setShapes(prevShapes => {
+        const newShapes = new Map(prevShapes);
+
+        // Handle deletions
+        event.changes.keys.forEach((change, key) => {
+          if (change.action === 'delete') {
+            newShapes.delete(key);
+          } else if (change.action === 'add' || change.action === 'update') {
+            const value = shapesMap.get(key);
+            if (value) {
+              newShapes.set(key, value as Shape);
+            }
+          }
+        });
+
+        return newShapes;
+      });
+    };
+
+    shapesMap.observe(observer);
+
+    // Initial sync - load all shapes
+    const initialSync = () => {
       const newShapes = new Map<string, Shape>();
       shapesMap.forEach((value, key) => {
         newShapes.set(key, value as Shape);
       });
       setShapes(newShapes);
     };
-
-    shapesMap.observe(observer);
-
-    // Initial sync
-    observer();
+    initialSync();
 
     // Cleanup
     return () => {
@@ -351,19 +372,19 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
     }
   }, [editingTextId]);
 
-  const handleShapeClick = (shapeId: string) => {
+  const handleShapeClick = useCallback((shapeId: string) => {
     setSelectedId(shapeId);
-  };
+  }, []);
 
-  const handleStageClick = (e: any) => {
+  const handleStageClick = useCallback((e: any) => {
     // Deselect when clicking on empty area
     const clickedOnEmpty = e.target === e.target.getStage();
     if (clickedOnEmpty) {
       setSelectedId(null);
     }
-  };
+  }, []);
 
-  const handleUndo = () => {
+  const handleUndo = useCallback(() => {
     console.log('Undo requested');
     if (undoManagerRef.current && undoManagerRef.current.canUndo()) {
       undoManagerRef.current.undo();
@@ -371,9 +392,9 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
     } else {
       console.log('Cannot undo - stack is empty');
     }
-  };
+  }, []);
 
-  const handleRedo = () => {
+  const handleRedo = useCallback(() => {
     console.log('Redo requested');
     if (undoManagerRef.current && undoManagerRef.current.canRedo()) {
       undoManagerRef.current.redo();
@@ -381,9 +402,9 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
     } else {
       console.log('Cannot redo - stack is empty');
     }
-  };
+  }, []);
 
-  const handleTransformEnd = (shapeId: string, e: any) => {
+  const handleTransformEnd = useCallback((shapeId: string, e: any) => {
     const node = e.target;
     const shape = shapesMap.get(shapeId) as Shape | undefined;
 
@@ -451,9 +472,9 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
 
       shapesMap.set(shapeId, updatedShape);
     }
-  };
+  }, [shapesMap]);
 
-  const handleDragEnd = (shapeId: string, e: any) => {
+  const handleDragEnd = useCallback((shapeId: string, e: any) => {
     const shape = shapesMap.get(shapeId);
     if (shape) {
       const updatedShape = {
@@ -463,7 +484,7 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
       };
       shapesMap.set(shapeId, updatedShape);
     }
-  };
+  }, [shapesMap]);
 
   const handleMouseDown = (e: any) => {
     const stage = e.target.getStage();
@@ -574,7 +595,7 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
   };
 
 
-  const handleTextBlur = () => {
+  const handleTextBlur = useCallback(() => {
     if (editingTextId && textareaValue.trim()) {
       // Only save if there's actual text content
       const newText: Shape = {
@@ -601,9 +622,9 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
     }
     setEditingTextId(null);
     setTextareaValue('');
-  };
+  }, [editingTextId, textareaValue, textareaPosition, selectedColor, shapesMap]);
 
-  const handleTextDoubleClick = (textId: string) => {
+  const handleTextDoubleClick = useCallback((textId: string) => {
     const textShape = shapesMap.get(textId) as Shape | undefined;
     if (textShape && textShape.type === 'text') {
       setEditingTextId(textId);
@@ -611,7 +632,7 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
       setTextareaPosition({ x: textShape.x, y: textShape.y });
       setTimeout(() => textareaRef.current?.focus(), 0);
     }
-  };
+  }, [shapesMap]);
 
   const handleMouseMove = (e: any) => {
     const stage = e.target.getStage();
@@ -623,10 +644,15 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
       return;
     }
 
+    // Throttle cursor updates to 100ms (10 updates/sec instead of 60+)
     if (pos && providerRef.current) {
-      const awareness = providerRef.current.awareness;
-      awareness.setLocalStateField('x', pos.x);
-      awareness.setLocalStateField('y', pos.y);
+      const now = Date.now();
+      if (now - lastCursorUpdateTime.current > 100) {
+        const awareness = providerRef.current.awareness;
+        awareness.setLocalStateField('x', pos.x);
+        awareness.setLocalStateField('y', pos.y);
+        lastCursorUpdateTime.current = now;
+      }
     }
 
     // Handle selection box drag
@@ -786,6 +812,41 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
 
   const stageWidth = window.innerWidth;
   const stageHeight = window.innerHeight;
+
+  // Memoize grid rendering to prevent recalculation on every render
+  const gridDots = useMemo(() => {
+    const gridSize = 30;
+    const dotRadius = 1.5;
+    const dots = [];
+
+    // Calculate visible bounds with some padding
+    const padding = 1000; // Extra dots beyond viewport
+    const minX = Math.floor((-stagePos.x - padding) / gridSize) * gridSize;
+    const maxX = Math.ceil((-stagePos.x + stageWidth + padding) / gridSize) * gridSize;
+    const minY = Math.floor((-stagePos.y - padding) / gridSize) * gridSize;
+    const maxY = Math.ceil((-stagePos.y + stageHeight + padding) / gridSize) * gridSize;
+
+    // Limit the range to prevent too many dots
+    const limitedMinX = Math.max(minX, -10000);
+    const limitedMaxX = Math.min(maxX, 10000);
+    const limitedMinY = Math.max(minY, -10000);
+    const limitedMaxY = Math.min(maxY, 10000);
+
+    for (let x = limitedMinX; x <= limitedMaxX; x += gridSize) {
+      for (let y = limitedMinY; y <= limitedMaxY; y += gridSize) {
+        dots.push(
+          <Circle
+            key={`dot-${x}-${y}`}
+            x={x}
+            y={y}
+            radius={dotRadius}
+            fill="#D1D5DB"
+          />
+        );
+      }
+    }
+    return dots;
+  }, [stagePos.x, stagePos.y, stageWidth, stageHeight]);
 
   const buttonBaseStyle: React.CSSProperties = {
     padding: '10px 16px',
@@ -1187,40 +1248,8 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
             height={100000}
             fill="#FAFAFA"
           />
-          {/* Infinite grid dots - only render visible ones */}
-          {(() => {
-            const gridSize = 30;
-            const dotRadius = 1.5;
-            const dots = [];
-
-            // Calculate visible bounds with some padding
-            const padding = 1000; // Extra dots beyond viewport
-            const minX = Math.floor((-stagePos.x - padding) / gridSize) * gridSize;
-            const maxX = Math.ceil((-stagePos.x + stageWidth + padding) / gridSize) * gridSize;
-            const minY = Math.floor((-stagePos.y - padding) / gridSize) * gridSize;
-            const maxY = Math.ceil((-stagePos.y + stageHeight + padding) / gridSize) * gridSize;
-
-            // Limit the range to prevent too many dots
-            const limitedMinX = Math.max(minX, -10000);
-            const limitedMaxX = Math.min(maxX, 10000);
-            const limitedMinY = Math.max(minY, -10000);
-            const limitedMaxY = Math.min(maxY, 10000);
-
-            for (let x = limitedMinX; x <= limitedMaxX; x += gridSize) {
-              for (let y = limitedMinY; y <= limitedMaxY; y += gridSize) {
-                dots.push(
-                  <Circle
-                    key={`dot-${x}-${y}`}
-                    x={x}
-                    y={y}
-                    radius={dotRadius}
-                    fill="#D1D5DB"
-                  />
-                );
-              }
-            }
-            return dots;
-          })()}
+          {/* Infinite grid dots - only render visible ones (memoized) */}
+          {gridDots}
         </Layer>
 
         {/* Main Content Layer */}
