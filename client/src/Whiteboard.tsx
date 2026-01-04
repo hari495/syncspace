@@ -4,8 +4,10 @@ import Konva from 'konva';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import Cursor from './Cursor';
+import { ShareDialog } from './components/workspace/ShareDialog';
+import { supabase } from './config/supabase';
 
-type Tool = 'select' | 'rectangle' | 'pencil' | 'text';
+type Tool = 'select' | 'rectangle' | 'pencil' | 'text' | null;
 
 interface Shape {
   id: string;
@@ -29,14 +31,6 @@ interface CursorState {
   y: number;
   user: string;
 }
-
-const generateRandomName = () => {
-  const adjectives = ['Happy', 'Clever', 'Swift', 'Bright', 'Cool', 'Kind'];
-  const nouns = ['Panda', 'Fox', 'Eagle', 'Wolf', 'Lion', 'Bear'];
-  const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
-  const noun = nouns[Math.floor(Math.random() * nouns.length)];
-  return `${adj}${noun}`;
-};
 
 const generateUserColor = (userId: number) => {
   const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2'];
@@ -110,20 +104,30 @@ const simplifyPath = (points: number[], tolerance: number = 2): number[] => {
   return simplified;
 };
 
-const Whiteboard = () => {
+interface WhiteboardProps {
+  roomName?: string;
+  workspaceId?: string;
+  workspaceName?: string;
+}
+
+export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspaceName }: WhiteboardProps) => {
   const [shapes, setShapes] = useState<Map<string, Shape>>(new Map());
   const [remoteCursors, setRemoteCursors] = useState<Map<number, CursorState>>(new Map());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [tool, setTool] = useState<Tool>('select');
+  const [tool, setTool] = useState<Tool>(null);
+  const [selectedColor, setSelectedColor] = useState('#000000');
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [textareaValue, setTextareaValue] = useState('');
   const [textareaPosition, setTextareaPosition] = useState({ x: 0, y: 0 });
   const [selectionBox, setSelectionBox] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
   const [ydoc] = useState(() => new Y.Doc());
   const [shapesMap] = useState(() => ydoc.getMap('shapes'));
   const providerRef = useRef<WebsocketProvider | null>(null);
-  const [userName] = useState(() => generateRandomName());
+  const [userName, setUserName] = useState('User');
+  const [isEditingName, setIsEditingName] = useState(false);
   const transformerRef = useRef<Konva.Transformer>(null);
   const shapeRefs = useRef<Map<string, Konva.Shape>>(new Map());
   const undoManagerRef = useRef<Y.UndoManager | null>(null);
@@ -135,11 +139,37 @@ const Whiteboard = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
 
+  // Get user's display name from Supabase
+  useEffect(() => {
+    const getUserName = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        // Try to get from profile first
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single();
+
+        if (profile?.full_name) {
+          setUserName(profile.full_name);
+        } else {
+          // Fallback to auth metadata
+          const name = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'User';
+          setUserName(name);
+        }
+      }
+    };
+
+    getUserName();
+  }, []);
+
   useEffect(() => {
     // Connect to the WebSocket server
+    const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:1234';
     const provider = new WebsocketProvider(
-      'ws://localhost:1234',
-      'syncspace-room',
+      wsUrl,
+      roomName,
       ydoc
     );
 
@@ -177,22 +207,8 @@ const Whiteboard = () => {
     const undoManager = new Y.UndoManager(shapesMap);
     undoManagerRef.current = undoManager;
 
-    // Initialize with a test shape if the map is empty
-    if (shapesMap.size === 0) {
-      const testShape: Shape = {
-        id: 'shape-1',
-        type: 'rectangle',
-        x: 100,
-        y: 100,
-        width: 150,
-        height: 100,
-        color: 'blue'
-      };
-      shapesMap.set(testShape.id, testShape);
-    }
-
     // Observe changes to the Y.Map and update React state
-    const observer = (event: Y.YMapEvent<Shape>) => {
+    const observer = () => {
       const newShapes = new Map<string, Shape>();
       shapesMap.forEach((value, key) => {
         newShapes.set(key, value as Shape);
@@ -203,7 +219,7 @@ const Whiteboard = () => {
     shapesMap.observe(observer);
 
     // Initial sync
-    observer({} as Y.YMapEvent<Shape>);
+    observer();
 
     // Cleanup
     return () => {
@@ -275,7 +291,7 @@ const Whiteboard = () => {
           // Move all in a single transaction for undo/redo
           ydoc.transact(() => {
             idsToMove.forEach(id => {
-              const shape = shapesMap.get(id);
+              const shape = shapesMap.get(id) as Shape | undefined;
               if (shape) {
                 shapesMap.set(id, {
                   ...shape,
@@ -365,13 +381,13 @@ const Whiteboard = () => {
 
   const handleTransformEnd = (shapeId: string, e: any) => {
     const node = e.target;
-    const shape = shapesMap.get(shapeId);
+    const shape = shapesMap.get(shapeId) as Shape | undefined;
 
     if (shape) {
       const scaleX = node.scaleX();
       const scaleY = node.scaleY();
 
-      const updatedShape = {
+      const updatedShape: any = {
         ...shape,
         x: node.x(),
         y: node.y(),
@@ -399,6 +415,21 @@ const Whiteboard = () => {
         node.scaleX(1);
         node.scaleY(1);
         node.radius(updatedShape.radius);
+      } else if (shape.type === 'line') {
+        // For lines, apply scale to all points and reset scale
+        const points = shape.points || [];
+        const scaledPoints = points.map((point, index) => {
+          return index % 2 === 0 ? point * scaleX : point * scaleY;
+        });
+
+        updatedShape.points = scaledPoints;
+        updatedShape.scaleX = 1;
+        updatedShape.scaleY = 1;
+
+        // Reset the node's scale immediately
+        node.scaleX(1);
+        node.scaleY(1);
+        node.points(scaledPoints);
       } else if (shape.type === 'text') {
         // For text, adjust width to wrap text instead of scaling
         const newWidth = Math.max(50, node.width() * scaleX);
@@ -456,9 +487,12 @@ const Whiteboard = () => {
         }
       }
     } else if (tool === 'pencil') {
-      const stage = e.target.getStage();
       const pos = stage.getPointerPosition();
       if (pos) {
+        // Convert to stage coordinates
+        const transform = stage.getAbsoluteTransform().copy().invert();
+        const stagePos = transform.point(pos);
+
         isDrawing.current = true;
         const id = `line-${Date.now()}`;
         currentLineId.current = id;
@@ -468,26 +502,29 @@ const Whiteboard = () => {
           type: 'line',
           x: 0,
           y: 0,
-          points: [pos.x, pos.y],
-          color: 'black'
+          points: [stagePos.x, stagePos.y],
+          color: selectedColor
         };
 
         shapesMap.set(id, newLine);
         lastUpdateTime.current = Date.now();
       }
     } else if (tool === 'rectangle') {
-      const stage = e.target.getStage();
       const pos = stage.getPointerPosition();
       if (pos) {
+        // Convert to stage coordinates
+        const transform = stage.getAbsoluteTransform().copy().invert();
+        const stagePos = transform.point(pos);
+
         const id = `rect-${Date.now()}`;
         const newRect: Shape = {
           id,
           type: 'rectangle',
-          x: pos.x,
-          y: pos.y,
+          x: stagePos.x,
+          y: stagePos.y,
           width: 100,
           height: 100,
-          color: 'blue'
+          color: selectedColor
         };
         shapesMap.set(id, newRect);
       }
@@ -538,7 +575,7 @@ const Whiteboard = () => {
         y: textareaPosition.y,
         text: textareaValue,
         fontSize: 20,
-        color: 'black'
+        color: selectedColor
       };
       shapesMap.set(editingTextId, newText);
     } else if (editingTextId) {
@@ -558,7 +595,7 @@ const Whiteboard = () => {
   };
 
   const handleTextDoubleClick = (textId: string) => {
-    const textShape = shapesMap.get(textId);
+    const textShape = shapesMap.get(textId) as Shape | undefined;
     if (textShape && textShape.type === 'text') {
       setEditingTextId(textId);
       setTextareaValue(textShape.text || '');
@@ -571,6 +608,12 @@ const Whiteboard = () => {
     const stage = e.target.getStage();
     const pos = stage.getPointerPosition();
 
+    // Handle panning
+    if (isPanning.current && pos) {
+      // Panning will be handled by making the stage draggable
+      return;
+    }
+
     if (pos && providerRef.current) {
       const awareness = providerRef.current.awareness;
       awareness.setLocalStateField('x', pos.x);
@@ -579,19 +622,27 @@ const Whiteboard = () => {
 
     // Handle selection box drag
     if (tool === 'select' && isSelecting.current && selectionBox && pos) {
+      // Convert to stage coordinates
+      const transform = stage.getAbsoluteTransform().copy().invert();
+      const stagePos = transform.point(pos);
+
       setSelectionBox({
         ...selectionBox,
-        x2: pos.x,
-        y2: pos.y
+        x2: stagePos.x,
+        y2: stagePos.y
       });
     }
 
     // Handle pencil drawing
     if (tool === 'pencil' && isDrawing.current && currentLineId.current && pos) {
-      const currentLine = shapesMap.get(currentLineId.current);
+      // Convert to stage coordinates
+      const transform = stage.getAbsoluteTransform().copy().invert();
+      const stagePos = transform.point(pos);
+
+      const currentLine = shapesMap.get(currentLineId.current) as Shape | undefined;
       if (currentLine && currentLine.points) {
-        const newPoints = [...currentLine.points, pos.x, pos.y];
-        const updatedLine = { ...currentLine, points: newPoints };
+        const newPoints = [...currentLine.points, stagePos.x, stagePos.y];
+        const updatedLine: Shape = { ...currentLine, points: newPoints };
 
         // Throttle updates to Y.js (only every 50ms)
         const now = Date.now();
@@ -610,7 +661,18 @@ const Whiteboard = () => {
     }
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e: any) => {
+    const stage = e.target?.getStage?.();
+
+    // Stop panning
+    if (isPanning.current) {
+      isPanning.current = false;
+      if (stage) {
+        stage.container().style.cursor = 'default';
+      }
+      return;
+    }
+
     // Handle selection box
     if (tool === 'select' && isSelecting.current && selectionBox) {
       const { x1, y1, x2, y2 } = selectionBox;
@@ -673,7 +735,8 @@ const Whiteboard = () => {
         }
 
         // Check if shape overlaps with selection box
-        const overlaps = shapeMinX !== undefined && shapeMinX <= maxX && shapeMaxX >= minX && shapeMinY <= maxY && shapeMaxY >= minY;
+        const overlaps = shapeMinX !== undefined && shapeMaxX !== undefined && shapeMinY !== undefined && shapeMaxY !== undefined &&
+          shapeMinX <= maxX && shapeMaxX >= minX && shapeMinY <= maxY && shapeMaxY >= minY;
 
         if (overlaps) {
           selected.add(id);
@@ -715,219 +778,411 @@ const Whiteboard = () => {
   const stageWidth = window.innerWidth;
   const stageHeight = window.innerHeight;
 
+  const buttonBaseStyle: React.CSSProperties = {
+    padding: '10px 16px',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    transition: 'all 0.2s ease',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    whiteSpace: 'nowrap'
+  };
+
+  const getToolButtonStyle = (isActive: boolean): React.CSSProperties => ({
+    ...buttonBaseStyle,
+    backgroundColor: isActive ? '#6366F1' : 'white',
+    color: isActive ? 'white' : '#374151',
+    boxShadow: isActive ? '0 2px 8px rgba(99, 102, 241, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
+  });
+
+  const actionButtonStyle: React.CSSProperties = {
+    ...buttonBaseStyle,
+    backgroundColor: 'white',
+    color: '#6B7280',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+  };
+
   return (
-    <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>
       {/* Toolbar */}
       <div style={{
         position: 'absolute',
-        top: 10,
-        left: 10,
+        top: 16,
+        left: '50%',
+        transform: 'translateX(-50%)',
         zIndex: 1000,
         display: 'flex',
         gap: '8px',
-        padding: '8px',
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
-        borderRadius: '8px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+        padding: '12px 16px',
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        borderRadius: '12px',
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+        backdropFilter: 'blur(10px)'
       }}>
         {/* Tool Selection */}
-        <button
-          onClick={() => setTool('select')}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: tool === 'select' ? '#FF6B6B' : '#f0f0f0',
-            color: tool === 'select' ? 'white' : '#333',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontWeight: 'bold',
-            fontSize: '14px'
-          }}
-          title="Select Tool"
-        >
-          ⬜ Select
-        </button>
-        <button
-          onClick={() => setTool('rectangle')}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: tool === 'rectangle' ? '#FF6B6B' : '#f0f0f0',
-            color: tool === 'rectangle' ? 'white' : '#333',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontWeight: 'bold',
-            fontSize: '14px'
-          }}
-          title="Rectangle Tool"
-        >
-          ▭ Rectangle
-        </button>
-        <button
-          onClick={() => setTool('pencil')}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: tool === 'pencil' ? '#FF6B6B' : '#f0f0f0',
-            color: tool === 'pencil' ? 'white' : '#333',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontWeight: 'bold',
-            fontSize: '14px'
-          }}
-          title="Pencil Tool"
-        >
-          ✎ Pencil
-        </button>
-        <button
-          onClick={() => {
-            setTool('text');
-            // Immediately create a text box in the center of the screen
-            const centerX = window.innerWidth / 2;
-            const centerY = window.innerHeight / 2;
-            const id = `text-${Date.now()}`;
-
-            setEditingTextId(id);
-            setTextareaValue('');
-            setTextareaPosition({ x: centerX, y: centerY });
-
-            console.log('Text tool activated, text box created at center');
-          }}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: tool === 'text' ? '#FF6B6B' : '#f0f0f0',
-            color: tool === 'text' ? 'white' : '#333',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontWeight: 'bold',
-            fontSize: '14px'
-          }}
-          title="Text Tool"
-        >
-          T Text
-        </button>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <button
+            onClick={() => setTool(tool === 'select' ? null : 'select')}
+            style={getToolButtonStyle(tool === 'select')}
+            title="Select Tool (V) - Click again to pan"
+            onMouseEnter={(e) => {
+              if (tool !== 'select') {
+                e.currentTarget.style.backgroundColor = '#F3F4F6';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (tool !== 'select') {
+                e.currentTarget.style.backgroundColor = 'white';
+              }
+            }}
+          >
+            <span style={{ fontSize: '16px' }}>↖</span>
+            <span>Select</span>
+          </button>
+          <button
+            onClick={() => setTool('rectangle')}
+            style={getToolButtonStyle(tool === 'rectangle')}
+            title="Rectangle Tool (R)"
+            onMouseEnter={(e) => {
+              if (tool !== 'rectangle') {
+                e.currentTarget.style.backgroundColor = '#F3F4F6';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (tool !== 'rectangle') {
+                e.currentTarget.style.backgroundColor = 'white';
+              }
+            }}
+          >
+            <span style={{ fontSize: '16px' }}>▭</span>
+            <span>Rectangle</span>
+          </button>
+          <button
+            onClick={() => setTool('pencil')}
+            style={getToolButtonStyle(tool === 'pencil')}
+            title="Pencil Tool (P)"
+            onMouseEnter={(e) => {
+              if (tool !== 'pencil') {
+                e.currentTarget.style.backgroundColor = '#F3F4F6';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (tool !== 'pencil') {
+                e.currentTarget.style.backgroundColor = 'white';
+              }
+            }}
+          >
+            <span style={{ fontSize: '16px' }}>✏</span>
+            <span>Pencil</span>
+          </button>
+          <button
+            onClick={() => {
+              setTool('text');
+              const centerX = window.innerWidth / 2;
+              const centerY = window.innerHeight / 2;
+              const id = `text-${Date.now()}`;
+              setEditingTextId(id);
+              setTextareaValue('');
+              setTextareaPosition({ x: centerX, y: centerY });
+            }}
+            style={getToolButtonStyle(tool === 'text')}
+            title="Text Tool (T)"
+            onMouseEnter={(e) => {
+              if (tool !== 'text') {
+                e.currentTarget.style.backgroundColor = '#F3F4F6';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (tool !== 'text') {
+                e.currentTarget.style.backgroundColor = 'white';
+              }
+            }}
+          >
+            <span style={{ fontSize: '16px', fontWeight: 'bold' }}>T</span>
+            <span>Text</span>
+          </button>
+        </div>
 
         {/* Divider */}
-        <div style={{ width: '1px', backgroundColor: '#ddd', margin: '0 4px' }} />
+        <div style={{ width: '1px', backgroundColor: '#E5E7EB', margin: '0 4px' }} />
+
+        {/* Color Picker */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '12px', color: '#6B7280', fontWeight: '500' }}>Color:</span>
+          <div style={{ display: 'flex', gap: '4px' }}>
+            {['#000000', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#FFFFFF'].map((color) => (
+              <button
+                key={color}
+                onClick={() => setSelectedColor(color)}
+                style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '6px',
+                  backgroundColor: color,
+                  border: selectedColor === color ? '3px solid #6366F1' : color === '#FFFFFF' ? '2px solid #E5E7EB' : '2px solid transparent',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  boxShadow: selectedColor === color ? '0 0 0 2px rgba(99, 102, 241, 0.2)' : '0 1px 2px rgba(0, 0, 0, 0.1)'
+                }}
+                title={color}
+              />
+            ))}
+            <input
+              type="color"
+              value={selectedColor}
+              onChange={(e) => setSelectedColor(e.target.value)}
+              style={{
+                width: '28px',
+                height: '28px',
+                borderRadius: '6px',
+                border: '2px solid #E5E7EB',
+                cursor: 'pointer',
+                padding: '0'
+              }}
+              title="Custom color"
+            />
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div style={{ width: '1px', backgroundColor: '#E5E7EB', margin: '0 4px' }} />
 
         {/* Undo/Redo */}
-        <button
-          onClick={handleUndo}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#4ECDC4',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontWeight: 'bold',
-            fontSize: '14px'
-          }}
-          title="Undo (Ctrl+Z)"
-        >
-          ↶ Undo
-        </button>
-        <button
-          onClick={handleRedo}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#45B7D1',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontWeight: 'bold',
-            fontSize: '14px'
-          }}
-          title="Redo (Ctrl+Y)"
-        >
-          ↷ Redo
-        </button>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <button
+            onClick={handleUndo}
+            style={actionButtonStyle}
+            title="Undo (Ctrl+Z)"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#F3F4F6';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'white';
+            }}
+          >
+            <span style={{ fontSize: '16px' }}>↶</span>
+          </button>
+          <button
+            onClick={handleRedo}
+            style={actionButtonStyle}
+            title="Redo (Ctrl+Y)"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#F3F4F6';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'white';
+            }}
+          >
+            <span style={{ fontSize: '16px' }}>↷</span>
+          </button>
+        </div>
       </div>
+
+      {/* User Info and Share Button */}
+      <div style={{
+        position: 'absolute',
+        top: 16,
+        right: 16,
+        zIndex: 1000,
+        display: 'flex',
+        gap: '8px'
+      }}>
+        {workspaceId && workspaceName && (
+          <button
+            onClick={() => setShareDialogOpen(true)}
+            style={{
+              ...actionButtonStyle,
+              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+              backdropFilter: 'blur(10px)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#F3F4F6';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+            }}
+          >
+            <span style={{ fontSize: '16px' }}>↗</span>
+            <span>Share</span>
+          </button>
+        )}
+
+        {isEditingName ? (
+          <input
+            type="text"
+            value={userName}
+            onChange={(e) => setUserName(e.target.value)}
+            onBlur={() => setIsEditingName(false)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setIsEditingName(false);
+              }
+            }}
+            autoFocus
+            style={{
+              padding: '10px 16px',
+              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+              borderRadius: '12px',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+              backdropFilter: 'blur(10px)',
+              fontSize: '14px',
+              fontWeight: '500',
+              color: '#374151',
+              border: '2px solid #6366F1',
+              outline: 'none',
+              width: '200px'
+            }}
+          />
+        ) : (
+          <div
+            onClick={() => setIsEditingName(true)}
+            style={{
+              padding: '10px 16px',
+              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+              borderRadius: '12px',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+              backdropFilter: 'blur(10px)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '14px',
+              color: '#374151',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#F3F4F6';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+            }}
+            title="Click to edit display name"
+          >
+            <div style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: '#10B981',
+              boxShadow: '0 0 0 2px rgba(16, 185, 129, 0.2)'
+            }} />
+            <span style={{ fontWeight: '500' }}>{userName}</span>
+            <span style={{ fontSize: '12px', color: '#9CA3AF', marginLeft: '4px' }}>✎</span>
+          </div>
+        )}
+      </div>
+
+      {/* Share Dialog */}
+      {workspaceId && workspaceName && (
+        <ShareDialog
+          workspaceId={workspaceId}
+          workspaceName={workspaceName}
+          open={shareDialogOpen}
+          onOpenChange={setShareDialogOpen}
+        />
+      )}
 
       {/* Inline text editing - styled to look like direct canvas editing */}
       {editingTextId && (
-        <>
-          {console.log('Rendering textarea for:', editingTextId, 'at position:', textareaPosition)}
-          <textarea
-            ref={textareaRef}
-            value={textareaValue}
-            onChange={(e) => {
-              setTextareaValue(e.target.value);
-            }}
-            onBlur={handleTextBlur}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') {
-                e.preventDefault();
-                handleTextBlur();
-              }
-            }}
-            placeholder="Type here..."
-            onMouseDown={(e) => {
-              // Prevent this click from reaching the Stage
-              e.stopPropagation();
-            }}
-            style={{
-              position: 'absolute',
-              top: textareaPosition.y,
-              left: textareaPosition.x,
-              fontSize: '20px',
-              border: '2px solid #3B82F6',
-              background: 'rgba(255, 255, 255, 0.95)',
-              padding: '4px 6px',
-              outline: 'none',
-              resize: 'both',
-              zIndex: 1000,
-              width: '200px',
-              height: '32px',
-              fontFamily: 'Arial, sans-serif',
-              color: 'black',
-              lineHeight: '1.2',
-              borderRadius: '4px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-              pointerEvents: 'auto',
-              overflow: 'auto',
-              whiteSpace: 'pre-wrap',
-              wordWrap: 'break-word'
-            }}
-          />
-        </>
+        <textarea
+          ref={textareaRef}
+          value={textareaValue}
+          onChange={(e) => {
+            setTextareaValue(e.target.value);
+          }}
+          onBlur={handleTextBlur}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              handleTextBlur();
+            }
+          }}
+          placeholder="Type here..."
+          onMouseDown={(e) => {
+            e.stopPropagation();
+          }}
+          style={{
+            position: 'absolute',
+            top: textareaPosition.y,
+            left: textareaPosition.x,
+            fontSize: '20px',
+            border: '2px solid #6366F1',
+            background: 'white',
+            padding: '6px 10px',
+            outline: 'none',
+            resize: 'both',
+            zIndex: 1000,
+            width: '200px',
+            height: '32px',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            color: '#1F2937',
+            lineHeight: '1.4',
+            borderRadius: '6px',
+            boxShadow: '0 4px 20px rgba(99, 102, 241, 0.2), 0 0 0 1px rgba(99, 102, 241, 0.1)',
+            pointerEvents: 'auto',
+            overflow: 'auto',
+            whiteSpace: 'pre-wrap',
+            wordWrap: 'break-word'
+          }}
+        />
       )}
 
       <Stage
+        ref={stageRef}
         width={stageWidth}
         height={stageHeight}
+        draggable={tool === null || (tool === 'select' && !isDrawing.current && !isSelecting.current)}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onClick={handleStageClick}
+        onDragEnd={(e) => {
+          const stage = e.target;
+          setStagePos({ x: stage.x(), y: stage.y() });
+        }}
       >
-        {/* Background Layer with Grid Pattern */}
+        {/* Background Layer with Infinite Grid Pattern */}
         <Layer listening={false}>
-          {/* Light gray background */}
+          {/* Large background rect */}
           <Rect
-            x={0}
-            y={0}
-            width={stageWidth}
-            height={stageHeight}
-            fill="#f5f5f5"
+            x={-50000}
+            y={-50000}
+            width={100000}
+            height={100000}
+            fill="#FAFAFA"
           />
-          {/* Grid dots */}
+          {/* Infinite grid dots - only render visible ones */}
           {(() => {
-            const gridSize = 25; // Distance between dots
-            const dotRadius = 1; // Size of each dot
+            const gridSize = 30;
+            const dotRadius = 1.5;
             const dots = [];
 
-            for (let x = 0; x < stageWidth; x += gridSize) {
-              for (let y = 0; y < stageHeight; y += gridSize) {
+            // Calculate visible bounds with some padding
+            const padding = 1000; // Extra dots beyond viewport
+            const minX = Math.floor((-stagePos.x - padding) / gridSize) * gridSize;
+            const maxX = Math.ceil((-stagePos.x + stageWidth + padding) / gridSize) * gridSize;
+            const minY = Math.floor((-stagePos.y - padding) / gridSize) * gridSize;
+            const maxY = Math.ceil((-stagePos.y + stageHeight + padding) / gridSize) * gridSize;
+
+            // Limit the range to prevent too many dots
+            const limitedMinX = Math.max(minX, -10000);
+            const limitedMaxX = Math.min(maxX, 10000);
+            const limitedMinY = Math.max(minY, -10000);
+            const limitedMaxY = Math.min(maxY, 10000);
+
+            for (let x = limitedMinX; x <= limitedMaxX; x += gridSize) {
+              for (let y = limitedMinY; y <= limitedMaxY; y += gridSize) {
                 dots.push(
                   <Circle
                     key={`dot-${x}-${y}`}
                     x={x}
                     y={y}
                     radius={dotRadius}
-                    fill="#d0d0d0"
+                    fill="#D1D5DB"
                   />
                 );
               }
@@ -953,12 +1208,12 @@ const Whiteboard = () => {
                   width={shape.width}
                   height={shape.height}
                   fill={shape.color}
-                  stroke={selectedIds.has(shape.id) ? '#3B82F6' : undefined}
-                  strokeWidth={selectedIds.has(shape.id) ? 3 : 0}
+                  stroke={selectedIds.has(shape.id) ? '#6366F1' : undefined}
+                  strokeWidth={selectedIds.has(shape.id) ? 2 : 0}
                   rotation={shape.rotation || 0}
                   scaleX={shape.scaleX || 1}
                   scaleY={shape.scaleY || 1}
-                  draggable
+                  draggable={tool === 'select'}
                   onClick={() => handleShapeClick(shape.id)}
                   onTap={() => handleShapeClick(shape.id)}
                   onDragEnd={(e) => handleDragEnd(shape.id, e)}
@@ -978,12 +1233,12 @@ const Whiteboard = () => {
                   y={shape.y}
                   radius={shape.radius}
                   fill={shape.color}
-                  stroke={selectedIds.has(shape.id) ? '#3B82F6' : undefined}
-                  strokeWidth={selectedIds.has(shape.id) ? 3 : 0}
+                  stroke={selectedIds.has(shape.id) ? '#6366F1' : undefined}
+                  strokeWidth={selectedIds.has(shape.id) ? 2 : 0}
                   rotation={shape.rotation || 0}
                   scaleX={shape.scaleX || 1}
                   scaleY={shape.scaleY || 1}
-                  draggable
+                  draggable={tool === 'select'}
                   onClick={() => handleShapeClick(shape.id)}
                   onTap={() => handleShapeClick(shape.id)}
                   onDragEnd={(e) => handleDragEnd(shape.id, e)}
@@ -991,49 +1246,28 @@ const Whiteboard = () => {
                 />
               );
             } else if (shape.type === 'line') {
-              const isSelected = selectedIds.has(shape.id);
               return (
-                <>
-                  {/* Actual line */}
-                  <Line
-                    key={shape.id}
-                    ref={(node) => {
-                      if (node) {
-                        shapeRefs.current.set(shape.id, node);
-                      }
-                    }}
-                    x={shape.x}
-                    y={shape.y}
-                    points={shape.points || []}
-                    stroke={shape.color}
-                    strokeWidth={2}
-                    hitStrokeWidth={20}
-                    tension={0.5}
-                    lineCap="round"
-                    lineJoin="round"
-                    draggable={tool === 'select'}
-                    onClick={() => handleShapeClick(shape.id)}
-                    onTap={() => handleShapeClick(shape.id)}
-                    onDragEnd={(e) => handleDragEnd(shape.id, e)}
-                  />
-                  {/* Selection outline on top */}
-                  {isSelected && (
-                    <Line
-                      key={`${shape.id}-outline`}
-                      x={shape.x}
-                      y={shape.y}
-                      points={shape.points || []}
-                      stroke="#3B82F6"
-                      strokeWidth={6}
-                      opacity={0.5}
-                      tension={0.5}
-                      lineCap="round"
-                      lineJoin="round"
-                      listening={false}
-                      dash={[10, 5]}
-                    />
-                  )}
-                </>
+                <Line
+                  key={shape.id}
+                  ref={(node) => {
+                    if (node) {
+                      shapeRefs.current.set(shape.id, node);
+                    }
+                  }}
+                  x={shape.x}
+                  y={shape.y}
+                  points={shape.points || []}
+                  stroke={shape.color}
+                  strokeWidth={2}
+                  hitStrokeWidth={20}
+                  tension={0.5}
+                  lineCap="round"
+                  lineJoin="round"
+                  draggable={tool === 'select'}
+                  onClick={() => handleShapeClick(shape.id)}
+                  onTap={() => handleShapeClick(shape.id)}
+                  onDragEnd={(e) => handleDragEnd(shape.id, e)}
+                />
               );
             } else if (shape.type === 'text') {
               // Don't render text that's being edited
@@ -1056,9 +1290,9 @@ const Whiteboard = () => {
                   width={shape.width || 200}
                   wrap="word"
                   align="left"
-                  stroke={selectedIds.has(shape.id) ? '#3B82F6' : undefined}
+                  stroke={selectedIds.has(shape.id) ? '#6366F1' : undefined}
                   strokeWidth={selectedIds.has(shape.id) ? 1 : 0}
-                  shadowColor={selectedIds.has(shape.id) ? '#3B82F6' : undefined}
+                  shadowColor={selectedIds.has(shape.id) ? '#6366F1' : undefined}
                   shadowBlur={selectedIds.has(shape.id) ? 8 : 0}
                   shadowOpacity={selectedIds.has(shape.id) ? 0.3 : 0}
                   rotation={shape.rotation || 0}
@@ -1095,8 +1329,8 @@ const Whiteboard = () => {
               y={Math.min(selectionBox.y1, selectionBox.y2)}
               width={Math.abs(selectionBox.x2 - selectionBox.x1)}
               height={Math.abs(selectionBox.y2 - selectionBox.y1)}
-              fill="rgba(59, 130, 246, 0.1)"
-              stroke="#3B82F6"
+              fill="rgba(99, 102, 241, 0.08)"
+              stroke="#6366F1"
               strokeWidth={2}
               dash={[5, 5]}
             />
@@ -1109,5 +1343,3 @@ const Whiteboard = () => {
     </div>
   );
 };
-
-export default Whiteboard;

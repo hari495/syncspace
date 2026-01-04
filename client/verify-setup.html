@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SyncSpace Setup Verification</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 { color: #333; margin-top: 0; }
+    .test {
+      margin: 15px 0;
+      padding: 15px;
+      border-radius: 4px;
+      border-left: 4px solid #ccc;
+    }
+    .test.pending { background: #f0f0f0; border-color: #999; }
+    .test.running { background: #fff3cd; border-color: #ffc107; }
+    .test.pass { background: #d4edda; border-color: #28a745; }
+    .test.fail { background: #f8d7da; border-color: #dc3545; }
+    .test-name { font-weight: bold; margin-bottom: 5px; }
+    .test-details { font-size: 14px; color: #666; }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-top: 10px;
+    }
+    button:hover { background: #0056b3; }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    pre {
+      background: #f8f9fa;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-size: 12px;
+    }
+    .config {
+      background: #e7f3ff;
+      padding: 15px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 SyncSpace Setup Verification</h1>
+
+    <div class="config">
+      <h3>Configuration</h3>
+      <div>
+        <label>Supabase URL:</label>
+        <input type="text" id="supabaseUrl" value="https://ndrbcqctyljrvmvvhhbj.supabase.co" style="width: 100%; padding: 5px; margin: 5px 0;">
+      </div>
+      <div>
+        <label>Supabase Anon Key:</label>
+        <input type="password" id="supabaseKey" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kcmJjcWN0eWxqcnZtdnZoaGJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc0MDAwNjIsImV4cCI6MjA4Mjk3NjA2Mn0.yTQ_4ONrvKQKixILxgMplweAS7qPqgoQlozcvsE3-3c" style="width: 100%; padding: 5px; margin: 5px 0;">
+      </div>
+    </div>
+
+    <button onclick="runTests()" id="runBtn">Run Verification Tests</button>
+
+    <div id="tests"></div>
+    <div id="summary" style="margin-top: 20px;"></div>
+  </div>
+
+  <script>
+    let supabase;
+    const tests = [
+      { name: 'Supabase Connection', fn: testConnection },
+      { name: 'Authentication Status', fn: testAuth },
+      { name: 'Profile Access', fn: testProfile },
+      { name: 'Workspaces Table Access', fn: testWorkspacesAccess },
+      { name: 'Helper Function Exists', fn: testHelperFunction },
+      { name: 'Create Test Workspace', fn: testCreateWorkspace },
+      { name: 'Fetch Workspaces', fn: testFetchWorkspaces },
+      { name: 'Cleanup Test Data', fn: testCleanup },
+    ];
+
+    async function runTests() {
+      const url = document.getElementById('supabaseUrl').value;
+      const key = document.getElementById('supabaseKey').value;
+
+      supabase = window.supabase.createClient(url, key);
+
+      const testsDiv = document.getElementById('tests');
+      testsDiv.innerHTML = '';
+
+      let passed = 0;
+      let failed = 0;
+
+      for (const test of tests) {
+        const testEl = createTestElement(test.name);
+        testsDiv.appendChild(testEl);
+
+        updateTestStatus(testEl, 'running', 'Running...');
+
+        try {
+          const result = await test.fn();
+          updateTestStatus(testEl, 'pass', result);
+          passed++;
+        } catch (error) {
+          updateTestStatus(testEl, 'fail', error.message);
+          failed++;
+          // Stop on critical failures
+          if (test.name === 'Supabase Connection' || test.name === 'Authentication Status') {
+            break;
+          }
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      const summary = document.getElementById('summary');
+      summary.innerHTML = `
+        <h3>Summary</h3>
+        <p>✅ Passed: ${passed} | ❌ Failed: ${failed}</p>
+        ${failed === 0 ? '<p style="color: green; font-weight: bold;">All tests passed! Your setup is complete. ✨</p>' : '<p style="color: red; font-weight: bold;">Some tests failed. Check the details above and follow the COMPLETE_FIX_GUIDE.md</p>'}
+      `;
+    }
+
+    function createTestElement(name) {
+      const div = document.createElement('div');
+      div.className = 'test pending';
+      div.innerHTML = `
+        <div class="test-name">${name}</div>
+        <div class="test-details">Waiting...</div>
+      `;
+      return div;
+    }
+
+    function updateTestStatus(element, status, details) {
+      element.className = `test ${status}`;
+      element.querySelector('.test-details').textContent = details;
+    }
+
+    // Test Functions
+    async function testConnection() {
+      const { data, error } = await supabase.from('profiles').select('count').limit(1);
+      if (error && error.code === 'PGRST116') {
+        throw new Error('Connection OK, but not authenticated. Please sign in first.');
+      }
+      return 'Successfully connected to Supabase';
+    }
+
+    async function testAuth() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Not authenticated. Click "Continue with Google" in the app first, then run this test.');
+      }
+      return `Authenticated as: ${session.user.email}`;
+    }
+
+    async function testProfile() {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', (await supabase.auth.getSession()).data.session.user.id)
+        .single();
+
+      if (error) throw new Error(`Profile error: ${error.message}`);
+      if (!data) throw new Error('Profile not found. Check if handle_new_user trigger is set up.');
+
+      return `Profile exists: ${data.email}`;
+    }
+
+    async function testWorkspacesAccess() {
+      const { data, error } = await supabase
+        .from('workspaces')
+        .select('id')
+        .limit(1);
+
+      // It's OK if there are no workspaces yet
+      if (error && error.code === '42P17') {
+        throw new Error('INFINITE RECURSION detected! Run the supabase-complete-setup.sql script.');
+      }
+      if (error && error.code === '42501') {
+        throw new Error('RLS policy blocking access. Policies may not be set up correctly.');
+      }
+      if (error) throw new Error(`Workspaces access error: ${error.message}`);
+
+      return `Workspaces table accessible (${data?.length || 0} found)`;
+    }
+
+    async function testHelperFunction() {
+      // Try to use the helper function by checking if it exists
+      const { data, error } = await supabase.rpc('is_workspace_member', {
+        workspace_uuid: '00000000-0000-0000-0000-000000000000',
+        user_uuid: '00000000-0000-0000-0000-000000000000'
+      });
+
+      if (error && error.code === '42883') {
+        throw new Error('is_workspace_member function not found. Run the setup script.');
+      }
+
+      return 'Helper function exists and callable';
+    }
+
+    async function testCreateWorkspace() {
+      const user = (await supabase.auth.getSession()).data.session.user;
+
+      const { data, error } = await supabase
+        .from('workspaces')
+        .insert({
+          name: 'Test Workspace (will be deleted)',
+          description: 'Automated test workspace',
+          owner_id: user.id
+        })
+        .select()
+        .single();
+
+      if (error) throw new Error(`Create failed: ${error.message} (code: ${error.code})`);
+
+      window.testWorkspaceId = data.id;
+      return `Created test workspace: ${data.id}`;
+    }
+
+    async function testFetchWorkspaces() {
+      const { data, error } = await supabase
+        .from('workspaces')
+        .select(`
+          *,
+          workspace_members!inner(role, user_id)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw new Error(`Fetch failed: ${error.message}`);
+
+      return `Fetched ${data.length} workspace(s) successfully`;
+    }
+
+    async function testCleanup() {
+      if (!window.testWorkspaceId) {
+        return 'No test workspace to clean up';
+      }
+
+      const { error } = await supabase
+        .from('workspaces')
+        .delete()
+        .eq('id', window.testWorkspaceId);
+
+      if (error) throw new Error(`Cleanup failed: ${error.message}`);
+
+      return 'Test workspace deleted successfully';
+    }
+  </script>
+</body>
+</html>

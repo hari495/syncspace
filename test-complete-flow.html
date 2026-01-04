@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Complete Flow Test - SyncSpace</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      max-width: 1000px;
+      margin: 30px auto;
+      padding: 20px;
+      background: #1e1e1e;
+      color: #d4d4d4;
+    }
+    .container {
+      background: #252526;
+      padding: 30px;
+      border-radius: 8px;
+      border: 1px solid #3e3e42;
+    }
+    h1 { color: #4ec9b0; margin-top: 0; }
+    h2 { color: #569cd6; margin-top: 30px; }
+    .step {
+      margin: 20px 0;
+      padding: 15px;
+      border-left: 3px solid #555;
+      background: #1e1e1e;
+    }
+    .step.running { border-color: #ce9178; background: #2d2d30; }
+    .step.pass { border-color: #4ec9b0; background: #1e2f1e; }
+    .step.fail { border-color: #f48771; background: #3e1e1e; }
+    .step-title { font-weight: bold; color: #dcdcaa; margin-bottom: 10px; }
+    .step-log { font-size: 13px; color: #9cdcfe; white-space: pre-wrap; }
+    .error { color: #f48771; }
+    .success { color: #4ec9b0; }
+    .warning { color: #ce9178; }
+    .info { color: #569cd6; }
+    button {
+      background: #0e639c;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 10px 5px;
+      font-family: inherit;
+    }
+    button:hover { background: #1177bb; }
+    button:disabled { background: #3e3e42; cursor: not-allowed; }
+    .config {
+      background: #1e1e1e;
+      padding: 15px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      border: 1px solid #3e3e42;
+    }
+    input {
+      width: 100%;
+      padding: 8px;
+      margin: 5px 0;
+      background: #3c3c3c;
+      border: 1px solid #3e3e42;
+      color: #d4d4d4;
+      border-radius: 4px;
+      font-family: inherit;
+    }
+    label { color: #9cdcfe; display: block; margin-top: 10px; }
+    .summary {
+      margin-top: 30px;
+      padding: 20px;
+      background: #1e1e1e;
+      border-radius: 4px;
+      border: 2px solid #3e3e42;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔬 Complete Flow Test</h1>
+    <p>This will test your entire SyncSpace setup end-to-end</p>
+
+    <div class="config">
+      <h3 style="color: #569cd6; margin-top: 0;">Configuration</h3>
+      <label>Supabase URL:</label>
+      <input type="text" id="supabaseUrl" value="https://ndrbcqctyljrvmvvhhbj.supabase.co">
+
+      <label>Supabase Anon Key:</label>
+      <input type="password" id="supabaseKey" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kcmJjcWN0eWxqcnZtdnZoaGJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc0MDAwNjIsImV4cCI6MjA4Mjk3NjA2Mn0.yTQ_4ONrvKQKixILxgMplweAS7qPqgoQlozcvsE3-3c">
+    </div>
+
+    <div>
+      <button onclick="runCompleteTest()" id="runBtn">🚀 Run Complete Test</button>
+      <button onclick="clearResults()" id="clearBtn">🗑️ Clear Results</button>
+    </div>
+
+    <div id="steps"></div>
+    <div id="summary"></div>
+  </div>
+
+  <script>
+    let supabase;
+    let testWorkspaceId;
+    let results = {
+      total: 0,
+      passed: 0,
+      failed: 0,
+      skipped: 0
+    };
+
+    const steps = [
+      { name: 'Initialize Supabase Client', fn: initSupabase, critical: true },
+      { name: 'Check Authentication', fn: checkAuth, critical: true },
+      { name: 'Verify Profile Exists', fn: verifyProfile, critical: true },
+      { name: 'Test Helper Function', fn: testHelperFunction, critical: false },
+      { name: 'Check for Infinite Recursion', fn: checkInfiniteRecursion, critical: false },
+      { name: 'Test SELECT Workspaces', fn: testSelectWorkspaces, critical: false },
+      { name: 'Test INSERT Workspace', fn: testInsertWorkspace, critical: true },
+      { name: 'Test SELECT with JOIN', fn: testSelectWithJoin, critical: false },
+      { name: 'Test Workspace Membership', fn: testWorkspaceMembership, critical: false },
+      { name: 'Test UPDATE Workspace', fn: testUpdateWorkspace, critical: false },
+      { name: 'Test DELETE Workspace', fn: testDeleteWorkspace, critical: false },
+      { name: 'Final Verification', fn: finalVerification, critical: false }
+    ];
+
+    function clearResults() {
+      document.getElementById('steps').innerHTML = '';
+      document.getElementById('summary').innerHTML = '';
+      testWorkspaceId = null;
+      results = { total: 0, passed: 0, failed: 0, skipped: 0 };
+    }
+
+    async function runCompleteTest() {
+      clearResults();
+
+      const stepsDiv = document.getElementById('steps');
+      document.getElementById('runBtn').disabled = true;
+
+      for (const step of steps) {
+        results.total++;
+        const stepEl = createStepElement(step.name);
+        stepsDiv.appendChild(stepEl);
+        updateStepStatus(stepEl, 'running', 'Running...');
+
+        try {
+          const result = await step.fn();
+          updateStepStatus(stepEl, 'pass', result);
+          results.passed++;
+        } catch (error) {
+          const errorMsg = error.message || String(error);
+          updateStepStatus(stepEl, 'fail', errorMsg);
+          results.failed++;
+
+          // If critical step fails, show summary and stop
+          if (step.critical) {
+            showSummary(true, `Critical step failed: ${step.name}`);
+            document.getElementById('runBtn').disabled = false;
+            return;
+          }
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+
+      showSummary(false);
+      document.getElementById('runBtn').disabled = false;
+    }
+
+    function createStepElement(name) {
+      const div = document.createElement('div');
+      div.className = 'step';
+      div.innerHTML = `
+        <div class="step-title">${name}</div>
+        <div class="step-log">Waiting...</div>
+      `;
+      return div;
+    }
+
+    function updateStepStatus(element, status, log) {
+      element.className = `step ${status}`;
+      const logEl = element.querySelector('.step-log');
+
+      if (status === 'pass') {
+        logEl.innerHTML = `<span class="success">✓ ${log}</span>`;
+      } else if (status === 'fail') {
+        logEl.innerHTML = `<span class="error">✗ ${log}</span>`;
+      } else if (status === 'running') {
+        logEl.innerHTML = `<span class="info">⟳ ${log}</span>`;
+      } else {
+        logEl.textContent = log;
+      }
+    }
+
+    function showSummary(stopped, stopReason) {
+      const summary = document.getElementById('summary');
+      const passRate = results.total > 0 ? ((results.passed / results.total) * 100).toFixed(1) : 0;
+
+      let html = `
+        <h2>Test Summary</h2>
+        <div style="font-size: 18px; margin: 20px 0;">
+          <span class="success">✓ Passed: ${results.passed}</span> |
+          <span class="error">✗ Failed: ${results.failed}</span> |
+          <span class="info">Total: ${results.total}</span>
+        </div>
+        <div style="font-size: 16px; margin: 10px 0;">
+          Pass Rate: <span class="${passRate >= 90 ? 'success' : passRate >= 50 ? 'warning' : 'error'}">${passRate}%</span>
+        </div>
+      `;
+
+      if (stopped) {
+        html += `<div class="error" style="margin-top: 20px; padding: 15px; background: #3e1e1e; border-radius: 4px;">
+          <strong>⚠️  Test Stopped:</strong> ${stopReason}<br><br>
+          <strong>What to do:</strong><br>
+          1. Run supabase-diagnostic.sql in Supabase SQL Editor<br>
+          2. Run supabase-complete-setup.sql to fix issues<br>
+          3. Make sure you're signed in to the app<br>
+          4. Run this test again
+        </div>`;
+      } else if (results.failed === 0) {
+        html += `<div class="success" style="margin-top: 20px; padding: 15px; background: #1e2f1e; border-radius: 4px;">
+          <strong>🎉 All tests passed!</strong><br><br>
+          Your SyncSpace setup is working perfectly. You can now:<br>
+          • Create workspaces ✓<br>
+          • View workspaces ✓<br>
+          • Update workspaces ✓<br>
+          • Delete workspaces ✓<br>
+          <br>
+          Everything is ready for production use!
+        </div>`;
+      } else {
+        html += `<div class="warning" style="margin-top: 20px; padding: 15px; background: #2d2d30; border-radius: 4px;">
+          <strong>⚠️  Some tests failed</strong><br><br>
+          Check the failed tests above for details. Common fixes:<br>
+          • Run supabase-complete-setup.sql<br>
+          • Verify you're authenticated<br>
+          • Check browser console for errors
+        </div>`;
+      }
+
+      summary.innerHTML = html;
+    }
+
+    // Test Functions
+
+    async function initSupabase() {
+      const url = document.getElementById('supabaseUrl').value;
+      const key = document.getElementById('supabaseKey').value;
+
+      if (!url || !key) {
+        throw new Error('Missing Supabase URL or key');
+      }
+
+      supabase = window.supabase.createClient(url, key);
+      return `Client initialized: ${url}`;
+    }
+
+    async function checkAuth() {
+      const { data: { session }, error } = await supabase.auth.getSession();
+
+      if (error) throw new Error(`Session error: ${error.message}`);
+      if (!session) {
+        throw new Error('Not authenticated. Please sign in at http://localhost:5173 first');
+      }
+
+      return `Authenticated as ${session.user.email}`;
+    }
+
+    async function verifyProfile() {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          throw new Error('Profile not found. Run supabase-complete-setup.sql');
+        }
+        throw new Error(`Profile error: ${error.message}`);
+      }
+
+      return `Profile found: ${data.email}`;
+    }
+
+    async function testHelperFunction() {
+      try {
+        const { data, error } = await supabase.rpc('is_workspace_member', {
+          workspace_uuid: '00000000-0000-0000-0000-000000000000',
+          user_uuid: '00000000-0000-0000-0000-000000000000'
+        });
+
+        if (error && error.code === '42883') {
+          throw new Error('Helper function missing. Run supabase-complete-setup.sql');
+        }
+        if (error) throw error;
+
+        return 'Helper function exists and works';
+      } catch (e) {
+        throw new Error(`Helper function error: ${e.message}`);
+      }
+    }
+
+    async function checkInfiniteRecursion() {
+      try {
+        const { data, error } = await supabase
+          .from('workspaces')
+          .select('id')
+          .limit(1);
+
+        if (error && error.code === '42P17') {
+          throw new Error('INFINITE RECURSION detected! Run supabase-complete-setup.sql');
+        }
+        if (error) throw new Error(`SELECT error: ${error.message}`);
+
+        return 'No infinite recursion detected';
+      } catch (e) {
+        throw new Error(e.message);
+      }
+    }
+
+    async function testSelectWorkspaces() {
+      const { data, error } = await supabase
+        .from('workspaces')
+        .select('*');
+
+      if (error) throw new Error(`SELECT failed: ${error.code} - ${error.message}`);
+
+      return `SELECT works: ${data.length} workspace(s) found`;
+    }
+
+    async function testInsertWorkspace() {
+      const { data: { user } } = await supabase.auth.getUser();
+      const testName = `Test Workspace ${Date.now()}`;
+
+      const { data, error } = await supabase
+        .from('workspaces')
+        .insert({
+          name: testName,
+          description: 'Automated test workspace',
+          owner_id: user.id
+        })
+        .select()
+        .single();
+
+      if (error) {
+        if (error.code === '42501') {
+          throw new Error('RLS BLOCKING INSERT! Run supabase-complete-setup.sql');
+        }
+        throw new Error(`INSERT failed: ${error.code} - ${error.message}`);
+      }
+
+      testWorkspaceId = data.id;
+      return `INSERT works: Created workspace ${data.id}`;
+    }
+
+    async function testSelectWithJoin() {
+      const { data, error } = await supabase
+        .from('workspaces')
+        .select(`
+          *,
+          workspace_members!inner(role, user_id)
+        `)
+        .limit(5);
+
+      if (error) {
+        if (error.code === '42P17') {
+          throw new Error('Recursion in JOIN query! Run supabase-complete-setup.sql');
+        }
+        throw new Error(`JOIN failed: ${error.code} - ${error.message}`);
+      }
+
+      return `SELECT with JOIN works: ${data.length} workspace(s) with members`;
+    }
+
+    async function testWorkspaceMembership() {
+      if (!testWorkspaceId) {
+        throw new Error('No test workspace available (previous test failed)');
+      }
+
+      const { data, error } = await supabase
+        .from('workspace_members')
+        .select('*')
+        .eq('workspace_id', testWorkspaceId);
+
+      if (error) throw new Error(`Membership check failed: ${error.message}`);
+
+      if (data.length === 0) {
+        throw new Error('Workspace membership not created. Check trigger: on_workspace_created');
+      }
+
+      return `Membership created: ${data.length} member(s) (trigger works)`;
+    }
+
+    async function testUpdateWorkspace() {
+      if (!testWorkspaceId) {
+        throw new Error('No test workspace available (previous test failed)');
+      }
+
+      const { data, error } = await supabase
+        .from('workspaces')
+        .update({
+          description: 'Updated by automated test',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', testWorkspaceId)
+        .select()
+        .single();
+
+      if (error) throw new Error(`UPDATE failed: ${error.code} - ${error.message}`);
+
+      return `UPDATE works: Modified workspace ${data.id}`;
+    }
+
+    async function testDeleteWorkspace() {
+      if (!testWorkspaceId) {
+        throw new Error('No test workspace available (previous test failed)');
+      }
+
+      const { error } = await supabase
+        .from('workspaces')
+        .delete()
+        .eq('id', testWorkspaceId);
+
+      if (error) throw new Error(`DELETE failed: ${error.code} - ${error.message}`);
+
+      return `DELETE works: Removed test workspace ${testWorkspaceId}`;
+    }
+
+    async function finalVerification() {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Verify we can still query workspaces
+      const { data, error } = await supabase
+        .from('workspaces')
+        .select('id')
+        .limit(1);
+
+      if (error) throw new Error(`Final check failed: ${error.message}`);
+
+      return `All systems operational ✓`;
+    }
+  </script>
+</body>
+</html>

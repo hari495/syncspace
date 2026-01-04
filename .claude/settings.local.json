@@ -4,7 +4,20 @@
       "Bash(npm install)",
       "Bash(npm install:*)",
       "Bash(npm init -y)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(timeout 3 npm start:*)",
+      "Bash(node -c:*)",
+      "Bash(npm start)",
+      "Bash(curl:*)",
+      "Bash(node test-connection.js:*)",
+      "Bash(npm run dev:*)",
+      "Bash(cat:*)",
+      "Bash(node test-sync.js:*)",
+      "Bash(node test-multi-client.js:*)",
+      "Bash(node:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)",
+      "Bash(xargs:*)"
     ]
   }
 }
