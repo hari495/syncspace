@@ -144,12 +144,14 @@ export async function deleteWorkspace(id: string): Promise<void> {
 }
 
 export async function getWorkspaceMembers(workspaceId: string): Promise<WorkspaceMember[]> {
+  console.log('🔍 Fetching members for workspace:', workspaceId)
+
   // Try with explicit join syntax first
   const { data, error } = await supabase
     .from('workspace_members')
     .select(`
       *,
-      user:profiles!user_id(
+      user:profiles!workspace_members_user_id_fkey(
         id,
         email,
         full_name,
@@ -160,34 +162,52 @@ export async function getWorkspaceMembers(workspaceId: string): Promise<Workspac
     .order('joined_at', { ascending: true })
 
   if (error) {
+    console.error('❌ Join query failed:', error)
     // Fall back to simple query with separate profile fetch
-    console.warn('Failed with join, fetching profiles separately:', error)
+    console.log('⚠️ Falling back to separate queries...')
     const { data: members, error: membersError } = await supabase
       .from('workspace_members')
       .select('*')
       .eq('workspace_id', workspaceId)
       .order('joined_at', { ascending: true })
 
-    if (membersError) throw membersError
+    if (membersError) {
+      console.error('❌ Members query failed:', membersError)
+      throw membersError
+    }
+
+    console.log('✅ Found members:', members?.length || 0)
 
     if (members && members.length > 0) {
       const userIds = members.map(m => m.user_id)
-      const { data: profiles } = await supabase
+      console.log('🔍 Fetching profiles for user IDs:', userIds)
+
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, email, full_name, avatar_url')
         .in('id', userIds)
 
-      if (profiles) {
+      if (profilesError) {
+        console.error('❌ Profiles query failed:', profilesError)
+        // Return members without profiles
         return members.map(member => ({
           ...member,
-          user: profiles.find(p => p.id === member.user_id)
+          user: undefined
         })) as WorkspaceMember[]
       }
+
+      console.log('✅ Found profiles:', profiles?.length || 0)
+
+      return members.map(member => ({
+        ...member,
+        user: profiles.find(p => p.id === member.user_id)
+      })) as WorkspaceMember[]
     }
 
     return members || []
   }
 
+  console.log('✅ Join query succeeded, found members:', data?.length || 0)
   return data || []
 }
 
@@ -195,6 +215,20 @@ export async function removeMember(workspaceId: string, userId: string): Promise
   const { error } = await supabase
     .from('workspace_members')
     .delete()
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', userId)
+
+  if (error) throw error
+}
+
+export async function updateMemberRole(
+  workspaceId: string,
+  userId: string,
+  newRole: 'owner' | 'editor' | 'viewer' | 'member'
+): Promise<void> {
+  const { error } = await supabase
+    .from('workspace_members')
+    .update({ role: newRole })
     .eq('workspace_id', workspaceId)
     .eq('user_id', userId)
 

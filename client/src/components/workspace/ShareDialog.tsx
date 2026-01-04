@@ -9,8 +9,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { createInviteToken, getWorkspaceMembers, removeMember } from '@/lib/workspaces'
-import { Share2, Copy, Check, UserMinus, User } from 'lucide-react'
+import { createInviteToken, getWorkspaceMembers, removeMember, updateMemberRole } from '@/lib/workspaces'
+import { Share2, Copy, Check, UserMinus, User, ChevronDown } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import type { WorkspaceMember } from '@/types/workspace'
 
@@ -50,20 +50,38 @@ export function ShareDialog({ workspaceId, workspaceName, open, onOpenChange }: 
   }
 
   const handleRemoveMember = async (memberId: string, userId: string) => {
+    console.log('Attempting to remove member:', { memberId, userId, workspaceId })
+
     if (!confirm('Are you sure you want to remove this member?')) {
       return
     }
 
     setRemovingMemberId(memberId)
     try {
+      console.log('Calling removeMember API...')
       await removeMember(workspaceId, userId)
+      console.log('Member removed successfully')
       // Refresh members list
       await loadMembers()
     } catch (error) {
       console.error('Failed to remove member:', error)
-      alert('Failed to remove member. Please try again.')
+      alert(`Failed to remove member: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setRemovingMemberId(null)
+    }
+  }
+
+  const handleRoleChange = async (userId: string, newRole: string) => {
+    console.log('Attempting to change role:', { userId, newRole, workspaceId })
+
+    try {
+      await updateMemberRole(workspaceId, userId, newRole as any)
+      console.log('Role updated successfully')
+      // Refresh members list
+      await loadMembers()
+    } catch (error) {
+      console.error('Failed to update role:', error)
+      alert(`Failed to update role: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
@@ -129,6 +147,18 @@ export function ShareDialog({ workspaceId, workspaceName, open, onOpenChange }: 
                 {members.map((member) => {
                   const isCurrentUser = member.user_id === user?.id
                   const isOwner = member.role === 'owner'
+                  const currentUserMember = members.find(m => m.user_id === user?.id)
+                  const canRemove = !isOwner && currentUserMember?.role === 'owner'
+
+                  // Debug logging
+                  if (isCurrentUser) {
+                    console.log('Current user member:', {
+                      name: member.user?.full_name,
+                      role: member.role,
+                      isOwner,
+                      currentUserRole: currentUserMember?.role
+                    })
+                  }
 
                   return (
                     <div
@@ -154,8 +184,12 @@ export function ShareDialog({ workspaceId, workspaceName, open, onOpenChange }: 
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-medium truncate">
                               {member.user?.full_name || member.user?.email}
-                              {isCurrentUser && <span className="text-muted-foreground ml-1">(you)</span>}
                             </p>
+                            {isCurrentUser && (
+                              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                                you
+                              </span>
+                            )}
                           </div>
                           {member.user?.email && member.user?.full_name && (
                             <p className="text-xs text-muted-foreground truncate">
@@ -166,20 +200,45 @@ export function ShareDialog({ workspaceId, workspaceName, open, onOpenChange }: 
 
                         {/* Role */}
                         <div className="flex items-center gap-2">
-                          <span className="text-sm text-muted-foreground capitalize">
-                            {member.role}
-                          </span>
+                          {isOwner ? (
+                            <span className="text-sm font-medium px-3 py-1 rounded-md bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
+                              Owner
+                            </span>
+                          ) : currentUserMember?.role === 'owner' ? (
+                            // Show dropdown for owner to change roles
+                            <select
+                              value={member.role}
+                              onChange={(e) => handleRoleChange(member.user_id, e.target.value)}
+                              className="text-sm border rounded-md px-2 py-1 bg-background"
+                            >
+                              <option value="editor">Editor</option>
+                              <option value="viewer">Viewer</option>
+                              <option value="member">Member</option>
+                            </select>
+                          ) : (
+                            <span className="text-sm text-muted-foreground capitalize">
+                              {member.role}
+                            </span>
+                          )}
 
                           {/* Remove button - only show for non-owners and if current user is owner */}
-                          {!isOwner && members.find(m => m.user_id === user?.id)?.role === 'owner' && (
+                          {canRemove && (
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8"
-                              onClick={() => handleRemoveMember(member.id, member.user_id)}
+                              className="h-8 w-8 hover:bg-destructive/10"
+                              onClick={() => {
+                                console.log('Remove button clicked for:', member.user?.full_name || member.user?.email)
+                                handleRemoveMember(member.id, member.user_id)
+                              }}
                               disabled={removingMemberId === member.id}
+                              title="Remove member"
                             >
-                              <UserMinus className="h-4 w-4 text-destructive" />
+                              {removingMemberId === member.id ? (
+                                <span className="text-xs">...</span>
+                              ) : (
+                                <UserMinus className="h-4 w-4 text-destructive" />
+                              )}
                             </Button>
                           )}
                         </div>
