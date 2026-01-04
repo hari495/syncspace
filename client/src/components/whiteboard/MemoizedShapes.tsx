@@ -125,13 +125,12 @@ export const MemoizedLine = memo(function MemoizedLine({
   y,
   points,
   color,
-  isSelected,
   canEdit,
   tool,
   onClick,
   onDragEnd,
   shapeRef,
-}: Omit<LineShapeProps, 'onTransformEnd'>) {
+}: Omit<LineShapeProps, 'onTransformEnd' | 'isSelected'>) {
   return (
     <Line
       key={id}

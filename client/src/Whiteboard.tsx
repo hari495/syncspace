@@ -214,23 +214,29 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
     undoManagerRef.current = undoManager;
 
     // Observe changes to the Y.Map and update React state
-    // Optimized: Use event changes to only update affected shapes
+    // Optimized: Extract changes synchronously, then update state
     const observer = (event: Y.YMapEvent<any>) => {
+      // Must extract changes synchronously before they expire
+      const changedKeys = new Map<string, { action: 'delete' | 'add' | 'update'; value?: any }>();
+      event.changes.keys.forEach((change, key) => {
+        if (change.action === 'delete') {
+          changedKeys.set(key, { action: 'delete' });
+        } else if (change.action === 'add' || change.action === 'update') {
+          const value = shapesMap.get(key);
+          changedKeys.set(key, { action: change.action, value });
+        }
+      });
+
+      // Now update state with extracted changes
       setShapes(prevShapes => {
         const newShapes = new Map(prevShapes);
-
-        // Handle deletions
-        event.changes.keys.forEach((change, key) => {
+        changedKeys.forEach((change, key) => {
           if (change.action === 'delete') {
             newShapes.delete(key);
-          } else if (change.action === 'add' || change.action === 'update') {
-            const value = shapesMap.get(key);
-            if (value) {
-              newShapes.set(key, value as Shape);
-            }
+          } else if (change.value) {
+            newShapes.set(key, change.value as Shape);
           }
         });
-
         return newShapes;
       });
     };
@@ -1318,12 +1324,10 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
                   rotation={shape.rotation}
                   scaleX={shape.scaleX}
                   scaleY={shape.scaleY}
-                  isSelected={isSelected}
                   canEdit={canEdit}
                   tool={tool}
                   onClick={() => handleShapeClick(shape.id)}
                   onDragEnd={(e) => handleDragEnd(shape.id, e)}
-                  onTransformEnd={(e) => handleTransformEnd(shape.id, e)}
                   shapeRef={shapeRef}
                 />
               );
