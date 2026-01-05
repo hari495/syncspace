@@ -1,0 +1,16 @@
+services:
+  # WebSocket Server
+  - type: web
+    name: syncspace-server
+    env: node
+    region: oregon
+    plan: free
+    rootDir: server
+    buildCommand: npm install --production
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: NODE_ENV
+        value: production
+    healthCheckPath: /
