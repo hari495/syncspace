@@ -5,22 +5,18 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js",
+    "start": "node index.simple.js",
+    "start:full": "node index.js",
+    "dev": "nodemon index.simple.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@y/websocket-server": "^0.1.1",
-    "classic-level": "^1.4.1",
-    "cors": "^2.8.5",
-    "express": "^5.2.1",
-    "level": "^8.0.1",
+    "lib0": "^0.2.102",
     "ws": "^8.18.3",
-    "y-leveldb": "^0.2.0",
-    "y-websocket": "^3.0.0",
+    "y-protocols": "^1.0.6",
     "yjs": "^13.6.28"
   },
   "devDependencies": {
