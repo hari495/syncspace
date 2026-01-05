@@ -4,7 +4,7 @@ import { setupWSConnection, setPersistence } from '@y/websocket-server/utils';
 import { LeveldbPersistence } from 'y-leveldb';
 import * as Y from 'yjs';
 
-const PORT = 1234;
+const PORT = process.env.PORT || 1234;
 
 // Initialize persistence with LevelDB
 const ldb = new LeveldbPersistence('./data');
