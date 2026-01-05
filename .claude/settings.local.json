@@ -24,7 +24,11 @@
       "Bash(wc:*)",
       "Bash(ls:*)",
       "Bash(mkdir:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(timeout 5 npm start:*)",
+      "Bash(npm uninstall:*)"
     ]
   }
 }
