@@ -107,6 +107,25 @@ export async function createWorkspace(input: CreateWorkspaceInput): Promise<Work
     .single()
 
   if (error) throw error
+
+  // Ensure creator is added as owner in workspace_members
+  // This is a safety measure in case the database trigger doesn't exist
+  const { error: memberError } = await supabase
+    .from('workspace_members')
+    .insert({
+      workspace_id: data.id,
+      user_id: user.id,
+      role: 'owner'
+    })
+
+  if (memberError) {
+    // If error is duplicate key (already added by trigger), that's okay
+    if (!memberError.message.includes('duplicate') && !memberError.message.includes('already exists')) {
+      console.error('Failed to add creator as owner:', memberError)
+      // Don't throw - workspace is created, just log the error
+    }
+  }
+
   return data as Workspace
 }
 
