@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from 'react';
 import { Text, Arrow, Rect } from 'react-konva';
 
 interface CursorProps {
@@ -8,15 +9,46 @@ interface CursorProps {
 }
 
 const Cursor = ({ x, y, userName, color }: CursorProps) => {
-  // Calculate text width (rough estimate)
+  const [currentPos, setCurrentPos] = useState({ x, y });
+  const animationFrameRef = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    const animate = () => {
+      setCurrentPos(prev => {
+        const dx = x - prev.x;
+        const dy = y - prev.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < 0.5) {
+          return { x, y };
+        }
+
+        const smoothing = 0.2;
+        return {
+          x: prev.x + dx * smoothing,
+          y: prev.y + dy * smoothing
+        };
+      });
+
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    animationFrameRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [x, y]);
+
   const textWidth = userName.length * 7 + 8;
   const textHeight = 20;
 
   return (
     <>
-      {/* Cursor arrow */}
       <Arrow
-        points={[x, y, x + 12, y + 16]}
+        points={[currentPos.x, currentPos.y, currentPos.x + 12, currentPos.y + 16]}
         pointerLength={6}
         pointerWidth={6}
         fill={color}
@@ -27,10 +59,9 @@ const Cursor = ({ x, y, userName, color }: CursorProps) => {
         shadowOffsetX={1}
         shadowOffsetY={1}
       />
-      {/* Name tag background */}
       <Rect
-        x={x + 18}
-        y={y + 8}
+        x={currentPos.x + 18}
+        y={currentPos.y + 8}
         width={textWidth}
         height={textHeight}
         fill={color}
@@ -39,10 +70,9 @@ const Cursor = ({ x, y, userName, color }: CursorProps) => {
         shadowBlur={4}
         shadowOffsetY={1}
       />
-      {/* Name text */}
       <Text
-        x={x + 22}
-        y={y + 12}
+        x={currentPos.x + 22}
+        y={currentPos.y + 12}
         text={userName}
         fontSize={12}
         fill="white"

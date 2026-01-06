@@ -7,7 +7,7 @@ export const GRID_MAX_EXTENT = 10000;
 export const CANVAS_BACKGROUND_COLOR = '#FAFAFA';
 export const CANVAS_BACKGROUND_SIZE = 100000;
 
-export const CURSOR_UPDATE_THROTTLE = 50;
+export const CURSOR_UPDATE_THROTTLE = 33;
 export const DRAWING_UPDATE_THROTTLE = 30;
 
 export const DEFAULT_RECTANGLE_SIZE = 100;
