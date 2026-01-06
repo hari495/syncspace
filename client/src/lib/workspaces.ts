@@ -8,6 +8,11 @@ export interface UpdateWorkspaceInput {
 }
 
 export async function getWorkspaces(): Promise<Workspace[]> {
+  // Get current user
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  // Only fetch workspaces where the current user is a member
   const { data, error } = await supabase
     .from('workspaces')
     .select(`
@@ -17,6 +22,7 @@ export async function getWorkspaces(): Promise<Workspace[]> {
         user_id
       )
     `)
+    .eq('workspace_members.user_id', user.id) // 🔒 CRITICAL: Filter by current user only!
     .order('created_at', { ascending: false })
 
   if (error) throw error
