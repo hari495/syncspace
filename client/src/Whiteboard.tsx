@@ -202,7 +202,28 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
 
   useEffect(() => {
     // Connect to the WebSocket server
-    const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:1234';
+    // Auto-detect WebSocket URL based on environment
+    const getWebSocketUrl = () => {
+      // Use env variable if explicitly set
+      if (import.meta.env.VITE_WS_URL) {
+        return import.meta.env.VITE_WS_URL;
+      }
+
+      // Auto-detect based on window location
+      const hostname = window.location.hostname;
+
+      // Production deployment - use Render server
+      if (hostname.includes('vercel.app') || hostname === 'syncspace.vercel.app') {
+        return 'wss://syncspace-server.onrender.com';
+      }
+
+      // Local development
+      return 'ws://localhost:1234';
+    };
+
+    const wsUrl = getWebSocketUrl();
+    console.log('🔌 Connecting to WebSocket:', wsUrl);
+
     const provider = new WebsocketProvider(
       wsUrl,
       roomName,
@@ -211,8 +232,13 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
 
     providerRef.current = provider;
 
-    provider.on('status', () => {
-      // WebSocket connected
+    provider.on('status', ({ status }: { status: string }) => {
+      console.log('📡 WebSocket status:', status);
+      if (status === 'connected') {
+        console.log('✅ WebSocket connected successfully');
+      } else if (status === 'disconnected') {
+        console.log('❌ WebSocket disconnected');
+      }
     });
 
     // Set up awareness
