@@ -39,9 +39,6 @@ const getYDoc = async (docname) => {
   const persistedState = await persistence.loadDocument(docname);
   if (persistedState) {
     Y.applyUpdate(doc, persistedState);
-    console.log(`📂 Loaded persisted document: ${docname}`);
-  } else {
-    console.log(`📄 Created new document: ${docname}`);
   }
 
   // Set up persistence on updates
@@ -74,8 +71,6 @@ const getAwareness = (docname, doc) => {
 
   const awareness = new awarenessProtocol.Awareness(doc);
   awarenessInstances.set(docname, awareness);
-  console.log(`👁️ Created awareness for: ${docname}`);
-
   return awareness;
 };
 
@@ -90,12 +85,10 @@ const setupWSConnection = async (conn, req, { docName = req.url.slice(1).split('
   // Get or create shared awareness for this document
   const awareness = getAwareness(docName, doc);
 
-  // Track this connection for broadcasting
   if (!documentConnections.has(docName)) {
     documentConnections.set(docName, new Set());
   }
   documentConnections.get(docName).add(conn);
-  console.log(`✅ Client connected to: ${docName}, total: ${documentConnections.get(docName).size}`);
 
   // Broadcast document updates to all other clients
   const docUpdateHandler = (update, origin) => {
@@ -180,22 +173,13 @@ const setupWSConnection = async (conn, req, { docName = req.url.slice(1).split('
     // Remove this connection's awareness updates
     awareness.off('update', awarenessChangeHandler);
 
-    // Remove all client states associated with this connection
     if (connectionClientIDs.size > 0) {
-      // Create awareness update to remove these clients
       awarenessProtocol.removeAwarenessStates(awareness, Array.from(connectionClientIDs), conn);
-      console.log(`❌ Client disconnected from: ${docName}, removed ${connectionClientIDs.size} client(s)`);
-    } else {
-      console.log(`❌ Client disconnected from: ${docName}`);
     }
 
-    // Remove from connection tracking
     const connections = documentConnections.get(docName);
     if (connections) {
       connections.delete(conn);
-      console.log(`📊 Remaining connections for ${docName}: ${connections.size}`);
-
-      // Clean up if no more connections
       if (connections.size === 0) {
         documentConnections.delete(docName);
       }
@@ -227,7 +211,6 @@ const server = http.createServer((req, res) => {
 const wss = new WebSocketServer({ server });
 
 wss.on('connection', (ws, req) => {
-  console.log('✅ New client connected');
   setupWSConnection(ws, req, { gc: true }).catch(err => {
     console.error('❌ Error setting up connection:', err);
     ws.close();

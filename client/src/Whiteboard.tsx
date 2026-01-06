@@ -222,24 +222,8 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
     };
 
     const wsUrl = getWebSocketUrl();
-    console.log('🔌 Connecting to WebSocket:', wsUrl);
-
-    const provider = new WebsocketProvider(
-      wsUrl,
-      roomName,
-      ydoc
-    );
-
+    const provider = new WebsocketProvider(wsUrl, roomName, ydoc);
     providerRef.current = provider;
-
-    provider.on('status', ({ status }: { status: string }) => {
-      console.log('📡 WebSocket status:', status);
-      if (status === 'connected') {
-        console.log('✅ WebSocket connected successfully');
-      } else if (status === 'disconnected') {
-        console.log('❌ WebSocket disconnected');
-      }
-    });
 
     // Set up awareness
     const awareness = provider.awareness;
@@ -735,13 +719,12 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
       return;
     }
 
-    // Throttle cursor updates
     if (pos && providerRef.current) {
       const now = Date.now();
       if (now - lastCursorUpdateTime.current > WHITEBOARD.CURSOR_UPDATE_THROTTLE) {
         const awareness = providerRef.current.awareness;
-        awareness.setLocalStateField('x', pos.x);
-        awareness.setLocalStateField('y', pos.y);
+        const currentState = awareness.getLocalState() || {};
+        awareness.setLocalState({ ...currentState, x: pos.x, y: pos.y });
         lastCursorUpdateTime.current = now;
       }
     }
