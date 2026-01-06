@@ -28,7 +28,9 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(timeout 5 npm start:*)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "WebFetch(domain:syncspace-ashen.vercel.app)",
+      "Bash(git push:*)"
     ]
   }
 }
