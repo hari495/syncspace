@@ -39,6 +39,23 @@ const generateUserColor = (userId: number) => {
   return WHITEBOARD.USER_COLORS[userId % WHITEBOARD.USER_COLORS.length];
 };
 
+// Helper functions for color conversion
+const hexToRgb = (hex: string): { r: number; g: number; b: number } => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : { r: 0, g: 0, b: 0 };
+};
+
+const rgbToHex = (r: number, g: number, b: number): string => {
+  return '#' + [r, g, b].map(x => {
+    const hex = Math.max(0, Math.min(255, Math.round(x))).toString(16);
+    return hex.length === 1 ? '0' + hex : hex;
+  }).join('');
+};
+
 // Ramer-Douglas-Peucker algorithm for line simplification
 const simplifyPath = (points: number[], tolerance: number = WHITEBOARD.PATH_SIMPLIFICATION_TOLERANCE): number[] => {
   if (points.length <= WHITEBOARD.MIN_POINTS_FOR_SIMPLIFICATION) return points;
@@ -127,6 +144,7 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [showShapeMenu, setShowShapeMenu] = useState(false);
   const [selectedShape, setSelectedShape] = useState<'rectangle' | 'circle'>('rectangle');
+  const [showColorPicker, setShowColorPicker] = useState(false);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [textareaValue, setTextareaValue] = useState('');
   const [textareaPosition, setTextareaPosition] = useState({ x: 0, y: 0 });
@@ -578,6 +596,9 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
         shapesMap.set(id, newCircle);
       }
     } else if (tool === 'line') {
+      // Prevent creating multiple lines if already drawing
+      if (isDrawing.current) return;
+
       const pos = stage.getPointerPosition();
       if (pos) {
         // Convert to stage coordinates
@@ -1241,42 +1262,129 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
 
         {/* Color Picker - Hide for viewers */}
         {!isViewer && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '12px', color: '#6B7280', fontWeight: '500' }}>Color:</span>
-          <div style={{ display: 'flex', gap: '4px' }}>
-            {WHITEBOARD.COLOR_PALETTE.map((color) => (
-              <button
-                key={color}
-                onClick={() => setSelectedColor(color)}
-                style={{
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '6px',
-                  backgroundColor: color,
-                  border: selectedColor === color ? '3px solid #6366F1' : color === '#FFFFFF' ? '2px solid #E5E7EB' : '2px solid transparent',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  boxShadow: selectedColor === color ? '0 0 0 2px rgba(99, 102, 241, 0.2)' : '0 1px 2px rgba(0, 0, 0, 0.1)'
-                }}
-                title={color}
-              />
-            ))}
-            <input
-              type="color"
-              value={selectedColor}
-              onChange={(e) => setSelectedColor(e.target.value)}
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowColorPicker(!showColorPicker)}
               style={{
-                width: '28px',
-                height: '28px',
-                borderRadius: '6px',
-                border: '2px solid #E5E7EB',
-                cursor: 'pointer',
-                padding: '0'
+                ...buttonBaseStyle,
+                padding: '10px 16px',
+                backgroundColor: 'white',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
               }}
-              title="Custom color"
-            />
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#F3F4F6';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'white';
+              }}
+            >
+              <div style={{
+                width: '24px',
+                height: '24px',
+                borderRadius: '4px',
+                backgroundColor: selectedColor,
+                border: '2px solid #E5E7EB',
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)'
+              }} />
+              <span style={{ fontSize: '12px', color: '#6B7280', fontWeight: '500' }}>Color</span>
+              <span style={{ fontSize: '10px', marginLeft: '2px', color: '#6B7280' }}>▼</span>
+            </button>
+            {showColorPicker && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                marginTop: '8px',
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                padding: '16px',
+                zIndex: 1001,
+                minWidth: '280px'
+              }}>
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{ fontSize: '12px', color: '#6B7280', fontWeight: '500', marginBottom: '8px' }}>
+                    Color Picker
+                  </div>
+                  <input
+                    type="color"
+                    value={selectedColor}
+                    onChange={(e) => setSelectedColor(e.target.value)}
+                    style={{
+                      width: '100%',
+                      height: '120px',
+                      border: '2px solid #E5E7EB',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      padding: '0'
+                    }}
+                  />
+                </div>
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{ fontSize: '12px', color: '#6B7280', fontWeight: '500', marginBottom: '8px' }}>
+                    RGB Values
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                    {['r', 'g', 'b'].map((channel) => {
+                      const rgb = hexToRgb(selectedColor);
+                      const value = rgb[channel as keyof typeof rgb];
+                      return (
+                        <div key={channel} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <label style={{ fontSize: '11px', color: '#9CA3AF', textTransform: 'uppercase' }}>
+                            {channel}
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="255"
+                            value={value}
+                            onChange={(e) => {
+                              const newValue = Math.max(0, Math.min(255, parseInt(e.target.value) || 0));
+                              const newRgb = { ...rgb, [channel]: newValue };
+                              setSelectedColor(rgbToHex(newRgb.r, newRgb.g, newRgb.b));
+                            }}
+                            style={{
+                              padding: '6px 8px',
+                              border: '1px solid #E5E7EB',
+                              borderRadius: '4px',
+                              fontSize: '13px',
+                              outline: 'none',
+                              textAlign: 'center'
+                            }}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', color: '#6B7280', fontWeight: '500', marginBottom: '8px' }}>
+                    Quick Colors
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                    {WHITEBOARD.COLOR_PALETTE.map((color) => (
+                      <button
+                        key={color}
+                        onClick={() => setSelectedColor(color)}
+                        style={{
+                          width: '100%',
+                          height: '32px',
+                          borderRadius: '4px',
+                          backgroundColor: color,
+                          border: selectedColor === color ? '2px solid #6366F1' : color === '#FFFFFF' ? '2px solid #E5E7EB' : '2px solid transparent',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease'
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
         )}
 
         {/* Divider */}
