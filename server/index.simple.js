@@ -68,9 +68,9 @@ const setupWSConnection = async (conn, req, { docName = req.url.slice(1).split('
 
   awareness.setLocalState(null);
 
-  const awarenessChangeHandler = ({ added, updated, removed }, conn) => {
+  const awarenessChangeHandler = ({ added, updated, removed }) => {
     const changedClients = added.concat(updated, removed);
-    if (conn.readyState === conn.OPEN) {
+    if (conn && conn.readyState === conn.OPEN && typeof conn.send === 'function') {
       const encoder = encoding.createEncoder();
       encoding.writeVarUint(encoder, messageAwareness);
       encoding.writeVarUint8Array(encoder, awarenessProtocol.encodeAwarenessUpdate(awareness, changedClients));

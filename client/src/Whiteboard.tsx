@@ -125,6 +125,8 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
   const [selectedColor, setSelectedColor] = useState('#000000');
   const [strokeWidth, setStrokeWidth] = useState(WHITEBOARD.DEFAULT_STROKE_WIDTH);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [showShapeMenu, setShowShapeMenu] = useState(false);
+  const [selectedShape, setSelectedShape] = useState<'rectangle' | 'circle'>('rectangle');
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [textareaValue, setTextareaValue] = useState('');
   const [textareaPosition, setTextareaPosition] = useState({ x: 0, y: 0 });
@@ -582,7 +584,10 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
         const transform = stage.getAbsoluteTransform().copy().invert();
         const stagePos = transform.point(pos);
 
+        isDrawing.current = true;
         const id = `line-${Date.now()}`;
+        currentLineId.current = id;
+
         const newLine: Shape = {
           id,
           type: 'line',
@@ -725,6 +730,36 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
         }
       }
     }
+
+    // Handle line tool drawing
+    if (tool === 'line' && isDrawing.current && currentLineId.current && pos) {
+      // Convert to stage coordinates
+      const transform = stage.getAbsoluteTransform().copy().invert();
+      const stagePos = transform.point(pos);
+
+      const currentLine = shapesMap.get(currentLineId.current) as Shape | undefined;
+      if (currentLine && currentLine.points && currentLine.points.length >= 2) {
+        // Update only the end point (keep start point, update end point)
+        const updatedLine: Shape = {
+          ...currentLine,
+          points: [currentLine.points[0], currentLine.points[1], stagePos.x, stagePos.y]
+        };
+
+        // Update local state immediately for smooth rendering
+        setShapes(prev => {
+          const newMap = new Map(prev);
+          newMap.set(currentLineId.current!, updatedLine);
+          return newMap;
+        });
+
+        // Also update Y.js (throttled)
+        const now = Date.now();
+        if (now - lastUpdateTime.current > WHITEBOARD.DRAWING_UPDATE_THROTTLE) {
+          shapesMap.set(currentLineId.current, updatedLine);
+          lastUpdateTime.current = now;
+        }
+      }
+    }
   };
 
   const handleMouseUp = (e: any) => {
@@ -824,6 +859,16 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
           points: simplifiedPoints
         };
         shapesMap.set(currentLineId.current, simplifiedLine);
+      }
+      isDrawing.current = false;
+      currentLineId.current = null;
+    }
+
+    if (tool === 'line' && isDrawing.current && currentLineId.current) {
+      // Finalize the line - save it to Y.js
+      const currentLine = shapes.get(currentLineId.current);
+      if (currentLine && currentLine.points) {
+        shapesMap.set(currentLineId.current, currentLine);
       }
       isDrawing.current = false;
       currentLineId.current = null;
@@ -935,52 +980,114 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
             <span style={{ fontSize: '16px' }}>↖</span>
             <span>Select</span>
           </button>
-          <button
-            onClick={() => !isViewer && setTool('rectangle')}
-            style={{
-              ...getToolButtonStyle(tool === 'rectangle'),
-              opacity: isViewer ? 0.5 : 1,
-              cursor: isViewer ? 'not-allowed' : 'pointer'
-            }}
-            title={isViewer ? "View only - editing disabled" : "Rectangle Tool (R)"}
-            disabled={isViewer}
-            onMouseEnter={(e) => {
-              if (tool !== 'rectangle') {
-                e.currentTarget.style.backgroundColor = '#F3F4F6';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (tool !== 'rectangle') {
-                e.currentTarget.style.backgroundColor = 'white';
-              }
-            }}
-          >
-            <span style={{ fontSize: '16px' }}>▭</span>
-            <span>Rectangle</span>
-          </button>
-          <button
-            onClick={() => !isViewer && setTool('circle')}
-            style={{
-              ...getToolButtonStyle(tool === 'circle'),
-              opacity: isViewer ? 0.5 : 1,
-              cursor: isViewer ? 'not-allowed' : 'pointer'
-            }}
-            title={isViewer ? "View only - editing disabled" : "Circle Tool (C)"}
-            disabled={isViewer}
-            onMouseEnter={(e) => {
-              if (tool !== 'circle' && !isViewer) {
-                e.currentTarget.style.backgroundColor = '#F3F4F6';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (tool !== 'circle') {
-                e.currentTarget.style.backgroundColor = 'white';
-              }
-            }}
-          >
-            <span style={{ fontSize: '16px' }}>○</span>
-            <span>Circle</span>
-          </button>
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => {
+                if (!isViewer) {
+                  setShowShapeMenu(!showShapeMenu);
+                  if (!showShapeMenu) {
+                    setTool(selectedShape);
+                  }
+                }
+              }}
+              style={{
+                ...getToolButtonStyle(tool === 'rectangle' || tool === 'circle'),
+                opacity: isViewer ? 0.5 : 1,
+                cursor: isViewer ? 'not-allowed' : 'pointer'
+              }}
+              title={isViewer ? "View only - editing disabled" : "Shapes Tool"}
+              disabled={isViewer}
+              onMouseEnter={(e) => {
+                if (tool !== 'rectangle' && tool !== 'circle' && !isViewer) {
+                  e.currentTarget.style.backgroundColor = '#F3F4F6';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (tool !== 'rectangle' && tool !== 'circle') {
+                  e.currentTarget.style.backgroundColor = 'white';
+                }
+              }}
+            >
+              <span style={{ fontSize: '16px' }}>{selectedShape === 'rectangle' ? '▭' : '○'}</span>
+              <span>Shapes</span>
+              <span style={{ fontSize: '10px', marginLeft: '2px' }}>▼</span>
+            </button>
+            {showShapeMenu && !isViewer && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                marginTop: '4px',
+                backgroundColor: 'white',
+                borderRadius: '6px',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                padding: '4px',
+                zIndex: 1001,
+                minWidth: '120px'
+              }}>
+                <button
+                  onClick={() => {
+                    setSelectedShape('rectangle');
+                    setTool('rectangle');
+                    setShowShapeMenu(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: 'none',
+                    borderRadius: '4px',
+                    backgroundColor: selectedShape === 'rectangle' ? '#F3F4F6' : 'transparent',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '14px',
+                    color: '#374151',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#F3F4F6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = selectedShape === 'rectangle' ? '#F3F4F6' : 'transparent';
+                  }}
+                >
+                  <span style={{ fontSize: '16px' }}>▭</span>
+                  <span>Rectangle</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedShape('circle');
+                    setTool('circle');
+                    setShowShapeMenu(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: 'none',
+                    borderRadius: '4px',
+                    backgroundColor: selectedShape === 'circle' ? '#F3F4F6' : 'transparent',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '14px',
+                    color: '#374151',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#F3F4F6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = selectedShape === 'circle' ? '#F3F4F6' : 'transparent';
+                  }}
+                >
+                  <span style={{ fontSize: '16px' }}>○</span>
+                  <span>Circle</span>
+                </button>
+              </div>
+            )}
+          </div>
           <button
             onClick={() => !isViewer && setTool('line')}
             style={{
@@ -1004,29 +1111,97 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
             <span style={{ fontSize: '16px' }}>╱</span>
             <span>Line</span>
           </button>
-          <button
-            onClick={() => !isViewer && setTool('pencil')}
-            style={{
-              ...getToolButtonStyle(tool === 'pencil'),
-              opacity: isViewer ? 0.5 : 1,
-              cursor: isViewer ? 'not-allowed' : 'pointer'
-            }}
-            title={isViewer ? "View only - editing disabled" : "Pencil Tool (P)"}
-            disabled={isViewer}
-            onMouseEnter={(e) => {
-              if (tool !== 'pencil' && !isViewer) {
-                e.currentTarget.style.backgroundColor = '#F3F4F6';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (tool !== 'pencil') {
-                e.currentTarget.style.backgroundColor = 'white';
-              }
-            }}
-          >
-            <span style={{ fontSize: '16px' }}>✏</span>
-            <span>Pencil</span>
-          </button>
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => !isViewer && setTool('pencil')}
+              style={{
+                ...getToolButtonStyle(tool === 'pencil'),
+                opacity: isViewer ? 0.5 : 1,
+                cursor: isViewer ? 'not-allowed' : 'pointer'
+              }}
+              title={isViewer ? "View only - editing disabled" : "Pencil Tool (P)"}
+              disabled={isViewer}
+              onMouseEnter={(e) => {
+                if (tool !== 'pencil' && !isViewer) {
+                  e.currentTarget.style.backgroundColor = '#F3F4F6';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (tool !== 'pencil') {
+                  e.currentTarget.style.backgroundColor = 'white';
+                }
+              }}
+            >
+              <span style={{ fontSize: '16px' }}>✏</span>
+              <span>Pencil</span>
+            </button>
+            {tool === 'pencil' && !isViewer && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                marginTop: '8px',
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                padding: '12px 16px',
+                zIndex: 1001,
+                minWidth: '180px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  fontSize: '12px',
+                  color: '#6B7280',
+                  fontWeight: '500'
+                }}>
+                  <span>Thickness</span>
+                  <span style={{ color: '#374151', fontWeight: '600' }}>{strokeWidth}px</span>
+                </div>
+                <input
+                  type="range"
+                  min="1"
+                  max="20"
+                  value={strokeWidth}
+                  onChange={(e) => setStrokeWidth(Number(e.target.value))}
+                  style={{
+                    width: '100%',
+                    height: '6px',
+                    borderRadius: '3px',
+                    background: `linear-gradient(to right, #6366F1 0%, #6366F1 ${((strokeWidth - 1) / 19) * 100}%, #E5E7EB ${((strokeWidth - 1) / 19) * 100}%, #E5E7EB 100%)`,
+                    outline: 'none',
+                    appearance: 'none',
+                    cursor: 'pointer'
+                  }}
+                />
+                <style>{`
+                  input[type="range"]::-webkit-slider-thumb {
+                    appearance: none;
+                    width: 16px;
+                    height: 16px;
+                    border-radius: 50%;
+                    background: #6366F1;
+                    cursor: pointer;
+                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                  }
+                  input[type="range"]::-moz-range-thumb {
+                    width: 16px;
+                    height: 16px;
+                    border-radius: 50%;
+                    background: #6366F1;
+                    cursor: pointer;
+                    border: none;
+                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                  }
+                `}</style>
+              </div>
+            )}
+          </div>
           <button
             onClick={() => {
               if (isViewer) return;
@@ -1102,45 +1277,6 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
             />
           </div>
         </div>
-        )}
-
-        {/* Divider */}
-        {!isViewer && <div style={{ width: '1px', backgroundColor: '#E5E7EB', margin: '0 4px' }} />}
-
-        {/* Stroke Width Selector */}
-        {!isViewer && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '12px', color: '#6B7280', fontWeight: '500' }}>Thickness:</span>
-            <div style={{ display: 'flex', gap: '4px' }}>
-              {WHITEBOARD.STROKE_WIDTHS.map((width, index) => (
-                <button
-                  key={width}
-                  onClick={() => setStrokeWidth(width)}
-                  style={{
-                    ...buttonBaseStyle,
-                    padding: '6px 12px',
-                    backgroundColor: strokeWidth === width ? '#6366F1' : 'white',
-                    color: strokeWidth === width ? 'white' : '#374151',
-                    boxShadow: strokeWidth === width ? '0 2px 8px rgba(99, 102, 241, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                    fontSize: '12px'
-                  }}
-                  title={WHITEBOARD.STROKE_WIDTH_LABELS[index]}
-                  onMouseEnter={(e) => {
-                    if (strokeWidth !== width) {
-                      e.currentTarget.style.backgroundColor = '#F3F4F6';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (strokeWidth !== width) {
-                      e.currentTarget.style.backgroundColor = 'white';
-                    }
-                  }}
-                >
-                  {WHITEBOARD.STROKE_WIDTH_LABELS[index].split(' ')[0]}
-                </button>
-              ))}
-            </div>
-          </div>
         )}
 
         {/* Divider */}
