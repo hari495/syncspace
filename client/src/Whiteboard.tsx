@@ -192,6 +192,14 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
     getUserName();
   }, []);
 
+  // Update awareness when userName changes
+  useEffect(() => {
+    if (providerRef.current && userName) {
+      const awareness = providerRef.current.awareness;
+      awareness.setLocalStateField('user', userName);
+    }
+  }, [userName]);
+
   useEffect(() => {
     // Connect to the WebSocket server
     const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:1234';

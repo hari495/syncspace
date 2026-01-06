@@ -12,6 +12,7 @@ export interface WorkspaceMember {
   role: 'owner' | 'editor' | 'viewer' | 'member'
   joined_at: string
   profiles?: Profile
+  user?: Profile
 }
 
 export interface Workspace {

@@ -145,10 +145,10 @@ export const ShareDialog = memo(function ShareDialog({ workspaceId, workspaceNam
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         {/* Avatar */}
                         <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-semibold">
-                          {member.profiles?.avatar_url ? (
+                          {member.user?.avatar_url ? (
                             <img
-                              src={member.profiles.avatar_url}
-                              alt={member.profiles.full_name || member.profiles.email}
+                              src={member.user.avatar_url}
+                              alt={member.user.full_name || member.user.email}
                               className="w-10 h-10 rounded-full"
                             />
                           ) : (
@@ -160,7 +160,7 @@ export const ShareDialog = memo(function ShareDialog({ workspaceId, workspaceNam
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-medium truncate">
-                              {member.profiles?.full_name || member.profiles?.email}
+                              {member.user?.full_name || member.user?.email || 'Unknown User'}
                             </p>
                             {isCurrentUser && (
                               <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
@@ -168,9 +168,9 @@ export const ShareDialog = memo(function ShareDialog({ workspaceId, workspaceNam
                               </span>
                             )}
                           </div>
-                          {member.profiles?.email && member.profiles?.full_name && (
+                          {member.user?.email && member.user?.full_name && (
                             <p className="text-xs text-muted-foreground truncate">
-                              {member.profiles.email}
+                              {member.user.email}
                             </p>
                           )}
                         </div>
