@@ -6,25 +6,64 @@ import * as awarenessProtocol from 'y-protocols/awareness';
 import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
 import * as map from 'lib0/map';
+import * as persistence from './persistence.js';
 
 const PORT = process.env.PORT || 1234;
 
 // Store Y.js documents in memory
 const docs = new Map();
 
-const getYDoc = (docname) => map.setIfUndefined(docs, docname, () => {
+// Debounce timers for persistence
+const persistenceTimers = new Map();
+const SAVE_DEBOUNCE_MS = 2000; // Save after 2 seconds of inactivity
+
+/**
+ * Get or create a Y.js document, loading from persistence if available
+ */
+const getYDoc = async (docname) => {
+  // If document is already in memory, return it
+  if (docs.has(docname)) {
+    return docs.get(docname);
+  }
+
+  // Create new document
   const doc = new Y.Doc();
-  console.log(`📄 Created new document: ${docname}`);
+
+  // Try to load persisted data
+  const persistedState = await persistence.loadDocument(docname);
+  if (persistedState) {
+    Y.applyUpdate(doc, persistedState);
+    console.log(`📂 Loaded persisted document: ${docname}`);
+  } else {
+    console.log(`📄 Created new document: ${docname}`);
+  }
+
+  // Set up persistence on updates
+  doc.on('update', (update) => {
+    // Debounce saves to avoid excessive disk writes
+    if (persistenceTimers.has(docname)) {
+      clearTimeout(persistenceTimers.get(docname));
+    }
+
+    const timer = setTimeout(async () => {
+      await persistence.saveDocument(docname, Y.encodeStateAsUpdate(doc));
+      persistenceTimers.delete(docname);
+    }, SAVE_DEBOUNCE_MS);
+
+    persistenceTimers.set(docname, timer);
+  });
+
+  docs.set(docname, doc);
   return doc;
-});
+};
 
 const messageSync = 0;
 const messageAwareness = 1;
 
 // Setup WebSocket connection for a Y.js document
-const setupWSConnection = (conn, req, { docName = req.url.slice(1).split('?')[0], gc = true } = {}) => {
+const setupWSConnection = async (conn, req, { docName = req.url.slice(1).split('?')[0], gc = true } = {}) => {
   conn.binaryType = 'arraybuffer';
-  const doc = getYDoc(docName);
+  const doc = await getYDoc(docName);
   const awareness = new awarenessProtocol.Awareness(doc);
 
   awareness.setLocalState(null);
@@ -96,10 +135,35 @@ const wss = new WebSocketServer({ server });
 
 wss.on('connection', (ws, req) => {
   console.log('✅ New client connected');
-  setupWSConnection(ws, req, { gc: true });
+  setupWSConnection(ws, req, { gc: true }).catch(err => {
+    console.error('❌ Error setting up connection:', err);
+    ws.close();
+  });
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   console.log(`🚀 SyncSpace WebSocket server running on port ${PORT}`);
   console.log(`📡 WebSocket URL: ws://localhost:${PORT}`);
+  console.log(`💾 Persistence enabled - data stored in ./data directory`);
+
+  // Show storage stats on startup
+  const stats = await persistence.getStats();
+  console.log(`📊 Storage: ${stats.documentCount} documents, ${stats.totalSizeMB} MB`);
+});
+
+// Graceful shutdown - save all pending documents
+process.on('SIGTERM', async () => {
+  console.log('🛑 Shutting down gracefully...');
+
+  // Clear all debounce timers and save immediately
+  for (const [docname, timer] of persistenceTimers.entries()) {
+    clearTimeout(timer);
+    const doc = docs.get(docname);
+    if (doc) {
+      await persistence.saveDocument(docname, Y.encodeStateAsUpdate(doc));
+    }
+  }
+
+  console.log('💾 All documents saved');
+  process.exit(0);
 });
