@@ -28,6 +28,11 @@ export const DEFAULT_LINE_HEIGHT = 1.2;
 export const MIN_SHAPE_SIZE = 5;
 export const MIN_TEXT_WIDTH = 50;
 
+// Stroke/Pen Thickness Options
+export const STROKE_WIDTHS = [2, 4, 8, 12, 16];
+export const DEFAULT_STROKE_WIDTH = 4;
+export const STROKE_WIDTH_LABELS = ['Thin', 'Regular', 'Medium', 'Thick', 'Extra Thick'];
+
 // Path Simplification
 export const PATH_SIMPLIFICATION_TOLERANCE = 2;
 export const MIN_POINTS_FOR_SIMPLIFICATION = 4;

@@ -7,6 +7,7 @@ interface BaseShapeProps {
   x: number;
   y: number;
   color: string;
+  strokeWidth?: number;
   rotation?: number;
   scaleX?: number;
   scaleY?: number;
@@ -46,6 +47,7 @@ export const MemoizedRectangle = memo(function MemoizedRectangle({
   width,
   height,
   color,
+  strokeWidth,
   rotation,
   scaleX,
   scaleY,
@@ -65,9 +67,9 @@ export const MemoizedRectangle = memo(function MemoizedRectangle({
       y={y}
       width={width}
       height={height}
-      fill={color}
-      stroke={isSelected ? '#6366F1' : undefined}
-      strokeWidth={isSelected ? 2 : 0}
+      fill="transparent"
+      stroke={isSelected ? '#6366F1' : color}
+      strokeWidth={isSelected ? (strokeWidth || 2) + 2 : (strokeWidth || 2)}
       rotation={rotation || 0}
       scaleX={scaleX || 1}
       scaleY={scaleY || 1}
@@ -86,6 +88,7 @@ export const MemoizedCircle = memo(function MemoizedCircle({
   y,
   radius,
   color,
+  strokeWidth,
   rotation,
   scaleX,
   scaleY,
@@ -104,9 +107,9 @@ export const MemoizedCircle = memo(function MemoizedCircle({
       x={x}
       y={y}
       radius={radius}
-      fill={color}
-      stroke={isSelected ? '#6366F1' : undefined}
-      strokeWidth={isSelected ? 2 : 0}
+      fill="transparent"
+      stroke={isSelected ? '#6366F1' : color}
+      strokeWidth={isSelected ? (strokeWidth || 2) + 2 : (strokeWidth || 2)}
       rotation={rotation || 0}
       scaleX={scaleX || 1}
       scaleY={scaleY || 1}
@@ -125,6 +128,7 @@ export const MemoizedLine = memo(function MemoizedLine({
   y,
   points,
   color,
+  strokeWidth,
   canEdit,
   tool,
   onClick,
@@ -139,7 +143,7 @@ export const MemoizedLine = memo(function MemoizedLine({
       y={y}
       points={points || []}
       stroke={color}
-      strokeWidth={2}
+      strokeWidth={strokeWidth || 2}
       hitStrokeWidth={20}
       tension={0.5}
       lineCap="round"

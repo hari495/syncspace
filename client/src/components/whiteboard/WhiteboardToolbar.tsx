@@ -5,9 +5,11 @@ import * as WHITEBOARD from '@/constants/whiteboard';
 interface WhiteboardToolbarProps {
   tool: Tool;
   selectedColor: string;
+  strokeWidth: number;
   isViewer: boolean;
   onToolChange: (tool: Tool) => void;
   onColorChange: (color: string) => void;
+  onStrokeWidthChange: (width: number) => void;
   onUndo: () => void;
   onRedo: () => void;
 }
@@ -43,9 +45,11 @@ const actionButtonStyle: React.CSSProperties = {
 export const WhiteboardToolbar = memo(function WhiteboardToolbar({
   tool,
   selectedColor,
+  strokeWidth,
   isViewer,
   onToolChange,
   onColorChange,
+  onStrokeWidthChange,
   onUndo,
   onRedo,
 }: WhiteboardToolbarProps) {
@@ -91,6 +95,32 @@ export const WhiteboardToolbar = memo(function WhiteboardToolbar({
         >
           <span style={{ fontSize: '16px' }}>▭</span>
           <span>Rectangle</span>
+        </button>
+        <button
+          onClick={() => !isViewer && onToolChange('circle')}
+          style={{
+            ...getToolButtonStyle(tool === 'circle'),
+            opacity: isViewer ? 0.5 : 1,
+            cursor: isViewer ? 'not-allowed' : 'pointer'
+          }}
+          title={isViewer ? "View only - editing disabled" : "Circle Tool (C)"}
+          disabled={isViewer}
+        >
+          <span style={{ fontSize: '16px' }}>○</span>
+          <span>Circle</span>
+        </button>
+        <button
+          onClick={() => !isViewer && onToolChange('line')}
+          style={{
+            ...getToolButtonStyle(tool === 'line'),
+            opacity: isViewer ? 0.5 : 1,
+            cursor: isViewer ? 'not-allowed' : 'pointer'
+          }}
+          title={isViewer ? "View only - editing disabled" : "Line Tool (L)"}
+          disabled={isViewer}
+        >
+          <span style={{ fontSize: '16px' }}>╱</span>
+          <span>Line</span>
         </button>
         <button
           onClick={() => !isViewer && onToolChange('pencil')}
@@ -159,6 +189,35 @@ export const WhiteboardToolbar = memo(function WhiteboardToolbar({
               }}
               title="Custom color"
             />
+          </div>
+        </div>
+      )}
+
+      {/* Divider */}
+      {!isViewer && <div style={{ width: '1px', backgroundColor: '#E5E7EB', margin: '0 4px' }} />}
+
+      {/* Stroke Width Selector */}
+      {!isViewer && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '12px', color: '#6B7280', fontWeight: '500' }}>Thickness:</span>
+          <div style={{ display: 'flex', gap: '4px' }}>
+            {WHITEBOARD.STROKE_WIDTHS.map((width, index) => (
+              <button
+                key={width}
+                onClick={() => onStrokeWidthChange(width)}
+                style={{
+                  ...buttonBaseStyle,
+                  padding: '6px 12px',
+                  backgroundColor: strokeWidth === width ? '#6366F1' : 'white',
+                  color: strokeWidth === width ? 'white' : '#374151',
+                  boxShadow: strokeWidth === width ? '0 2px 8px rgba(99, 102, 241, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
+                  fontSize: '12px'
+                }}
+                title={WHITEBOARD.STROKE_WIDTH_LABELS[index]}
+              >
+                {WHITEBOARD.STROKE_WIDTH_LABELS[index].split(' ')[0]}
+              </button>
+            ))}
           </div>
         </div>
       )}

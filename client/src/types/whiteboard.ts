@@ -1,4 +1,4 @@
-export type Tool = 'select' | 'rectangle' | 'pencil' | 'text' | null;
+export type Tool = 'select' | 'rectangle' | 'circle' | 'line' | 'pencil' | 'text' | null;
 
 export interface Shape {
   id: string;
@@ -12,6 +12,7 @@ export interface Shape {
   text?: string;
   fontSize?: number;
   color: string;
+  strokeWidth?: number;
   rotation?: number;
   scaleX?: number;
   scaleY?: number;

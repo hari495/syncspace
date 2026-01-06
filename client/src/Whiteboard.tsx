@@ -9,7 +9,7 @@ import { supabase } from './config/supabase';
 import { MemoizedRectangle, MemoizedCircle, MemoizedLine, MemoizedText } from './components/whiteboard/MemoizedShapes';
 import * as WHITEBOARD from './constants/whiteboard';
 
-type Tool = 'select' | 'rectangle' | 'pencil' | 'text' | null;
+type Tool = 'select' | 'rectangle' | 'circle' | 'line' | 'pencil' | 'text' | null;
 
 interface Shape {
   id: string;
@@ -23,6 +23,7 @@ interface Shape {
   text?: string;
   fontSize?: number;
   color: string;
+  strokeWidth?: number;
   rotation?: number;
   scaleX?: number;
   scaleY?: number;
@@ -122,6 +123,7 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [tool, setTool] = useState<Tool>(null);
   const [selectedColor, setSelectedColor] = useState('#000000');
+  const [strokeWidth, setStrokeWidth] = useState(WHITEBOARD.DEFAULT_STROKE_WIDTH);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [textareaValue, setTextareaValue] = useState('');
@@ -527,7 +529,8 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
           x: 0,
           y: 0,
           points: [stagePos.x, stagePos.y],
-          color: selectedColor
+          color: selectedColor,
+          strokeWidth: strokeWidth
         };
 
         shapesMap.set(id, newLine);
@@ -548,9 +551,48 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
           y: stagePos.y,
           width: WHITEBOARD.DEFAULT_RECTANGLE_SIZE,
           height: WHITEBOARD.DEFAULT_RECTANGLE_SIZE,
-          color: selectedColor
+          color: selectedColor,
+          strokeWidth: strokeWidth
         };
         shapesMap.set(id, newRect);
+      }
+    } else if (tool === 'circle') {
+      const pos = stage.getPointerPosition();
+      if (pos) {
+        // Convert to stage coordinates
+        const transform = stage.getAbsoluteTransform().copy().invert();
+        const stagePos = transform.point(pos);
+
+        const id = `circle-${Date.now()}`;
+        const newCircle: Shape = {
+          id,
+          type: 'circle',
+          x: stagePos.x,
+          y: stagePos.y,
+          radius: WHITEBOARD.DEFAULT_CIRCLE_RADIUS,
+          color: selectedColor,
+          strokeWidth: strokeWidth
+        };
+        shapesMap.set(id, newCircle);
+      }
+    } else if (tool === 'line') {
+      const pos = stage.getPointerPosition();
+      if (pos) {
+        // Convert to stage coordinates
+        const transform = stage.getAbsoluteTransform().copy().invert();
+        const stagePos = transform.point(pos);
+
+        const id = `line-${Date.now()}`;
+        const newLine: Shape = {
+          id,
+          type: 'line',
+          x: 0,
+          y: 0,
+          points: [stagePos.x, stagePos.y, stagePos.x, stagePos.y],
+          color: selectedColor,
+          strokeWidth: strokeWidth
+        };
+        shapesMap.set(id, newLine);
       }
     } else if (tool === 'text') {
       // If currently editing, finish that first
@@ -917,6 +959,52 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
             <span>Rectangle</span>
           </button>
           <button
+            onClick={() => !isViewer && setTool('circle')}
+            style={{
+              ...getToolButtonStyle(tool === 'circle'),
+              opacity: isViewer ? 0.5 : 1,
+              cursor: isViewer ? 'not-allowed' : 'pointer'
+            }}
+            title={isViewer ? "View only - editing disabled" : "Circle Tool (C)"}
+            disabled={isViewer}
+            onMouseEnter={(e) => {
+              if (tool !== 'circle' && !isViewer) {
+                e.currentTarget.style.backgroundColor = '#F3F4F6';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (tool !== 'circle') {
+                e.currentTarget.style.backgroundColor = 'white';
+              }
+            }}
+          >
+            <span style={{ fontSize: '16px' }}>○</span>
+            <span>Circle</span>
+          </button>
+          <button
+            onClick={() => !isViewer && setTool('line')}
+            style={{
+              ...getToolButtonStyle(tool === 'line'),
+              opacity: isViewer ? 0.5 : 1,
+              cursor: isViewer ? 'not-allowed' : 'pointer'
+            }}
+            title={isViewer ? "View only - editing disabled" : "Line Tool (L)"}
+            disabled={isViewer}
+            onMouseEnter={(e) => {
+              if (tool !== 'line' && !isViewer) {
+                e.currentTarget.style.backgroundColor = '#F3F4F6';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (tool !== 'line') {
+                e.currentTarget.style.backgroundColor = 'white';
+              }
+            }}
+          >
+            <span style={{ fontSize: '16px' }}>╱</span>
+            <span>Line</span>
+          </button>
+          <button
             onClick={() => !isViewer && setTool('pencil')}
             style={{
               ...getToolButtonStyle(tool === 'pencil'),
@@ -1014,6 +1102,45 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
             />
           </div>
         </div>
+        )}
+
+        {/* Divider */}
+        {!isViewer && <div style={{ width: '1px', backgroundColor: '#E5E7EB', margin: '0 4px' }} />}
+
+        {/* Stroke Width Selector */}
+        {!isViewer && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '12px', color: '#6B7280', fontWeight: '500' }}>Thickness:</span>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              {WHITEBOARD.STROKE_WIDTHS.map((width, index) => (
+                <button
+                  key={width}
+                  onClick={() => setStrokeWidth(width)}
+                  style={{
+                    ...buttonBaseStyle,
+                    padding: '6px 12px',
+                    backgroundColor: strokeWidth === width ? '#6366F1' : 'white',
+                    color: strokeWidth === width ? 'white' : '#374151',
+                    boxShadow: strokeWidth === width ? '0 2px 8px rgba(99, 102, 241, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
+                    fontSize: '12px'
+                  }}
+                  title={WHITEBOARD.STROKE_WIDTH_LABELS[index]}
+                  onMouseEnter={(e) => {
+                    if (strokeWidth !== width) {
+                      e.currentTarget.style.backgroundColor = '#F3F4F6';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (strokeWidth !== width) {
+                      e.currentTarget.style.backgroundColor = 'white';
+                    }
+                  }}
+                >
+                  {WHITEBOARD.STROKE_WIDTH_LABELS[index].split(' ')[0]}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* Divider */}
@@ -1247,6 +1374,7 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
                   width={shape.width}
                   height={shape.height}
                   color={shape.color}
+                  strokeWidth={shape.strokeWidth}
                   rotation={shape.rotation}
                   scaleX={shape.scaleX}
                   scaleY={shape.scaleY}
@@ -1268,6 +1396,7 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
                   y={shape.y}
                   radius={shape.radius}
                   color={shape.color}
+                  strokeWidth={shape.strokeWidth}
                   rotation={shape.rotation}
                   scaleX={shape.scaleX}
                   scaleY={shape.scaleY}
@@ -1289,6 +1418,7 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
                   y={shape.y}
                   points={shape.points}
                   color={shape.color}
+                  strokeWidth={shape.strokeWidth}
                   rotation={shape.rotation}
                   scaleX={shape.scaleX}
                   scaleY={shape.scaleY}
