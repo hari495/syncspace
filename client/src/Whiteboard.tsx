@@ -214,7 +214,7 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
 
       // Production deployment - use Render server
       if (hostname.includes('vercel.app') || hostname === 'syncspace.vercel.app') {
-        return 'wss://syncspace-server.onrender.com';
+        return 'wss://syncspace-server-k1zf.onrender.com';
       }
 
       // Local development

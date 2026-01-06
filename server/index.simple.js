@@ -13,6 +13,9 @@ const PORT = process.env.PORT || 1234;
 // Store Y.js documents in memory
 const docs = new Map();
 
+// Store awareness instances per document (shared across all clients)
+const awarenessInstances = new Map();
+
 // Debounce timers for persistence
 const persistenceTimers = new Map();
 const SAVE_DEBOUNCE_MS = 2000; // Save after 2 seconds of inactivity
@@ -57,6 +60,22 @@ const getYDoc = async (docname) => {
   return doc;
 };
 
+/**
+ * Get or create an Awareness instance for a document
+ * Awareness is shared across all clients connected to the same document
+ */
+const getAwareness = (docname, doc) => {
+  if (awarenessInstances.has(docname)) {
+    return awarenessInstances.get(docname);
+  }
+
+  const awareness = new awarenessProtocol.Awareness(doc);
+  awarenessInstances.set(docname, awareness);
+  console.log(`👁️ Created awareness for: ${docname}`);
+
+  return awareness;
+};
+
 const messageSync = 0;
 const messageAwareness = 1;
 
@@ -64,10 +83,11 @@ const messageAwareness = 1;
 const setupWSConnection = async (conn, req, { docName = req.url.slice(1).split('?')[0], gc = true } = {}) => {
   conn.binaryType = 'arraybuffer';
   const doc = await getYDoc(docName);
-  const awareness = new awarenessProtocol.Awareness(doc);
 
-  awareness.setLocalState(null);
+  // Get or create shared awareness for this document
+  const awareness = getAwareness(docName, doc);
 
+  // Broadcast awareness updates to all connected clients
   const awarenessChangeHandler = ({ added, updated, removed }) => {
     const changedClients = added.concat(updated, removed);
     if (conn && conn.readyState === conn.OPEN && typeof conn.send === 'function') {
@@ -95,7 +115,21 @@ const setupWSConnection = async (conn, req, { docName = req.url.slice(1).split('
           }
           break;
         case messageAwareness:
-          awarenessProtocol.applyAwarenessUpdate(awareness, decoding.readVarUint8Array(decoder), conn);
+          const awarenessUpdate = decoding.readVarUint8Array(decoder);
+          awarenessProtocol.applyAwarenessUpdate(awareness, awarenessUpdate, conn);
+
+          // Track client IDs from this connection
+          // Decode the awareness update to extract client IDs
+          const updateDecoder = decoding.createDecoder(awarenessUpdate);
+          const numClients = decoding.readVarUint(updateDecoder);
+          for (let i = 0; i < numClients; i++) {
+            const clientID = decoding.readVarUint(updateDecoder);
+            connectionClientIDs.add(clientID);
+            // Skip clock and state
+            decoding.readVarUint(updateDecoder); // clock
+            const stateLen = decoding.readVarUint(updateDecoder);
+            decoding.readVarUint8Array(updateDecoder); // state
+          }
           break;
       }
     } catch (err) {
@@ -103,10 +137,21 @@ const setupWSConnection = async (conn, req, { docName = req.url.slice(1).split('
     }
   });
 
+  // Track client IDs for this connection
+  const connectionClientIDs = new Set();
+
   conn.on('close', () => {
+    // Remove this connection's awareness updates
     awareness.off('update', awarenessChangeHandler);
-    awareness.destroy();
-    console.log(`❌ Client disconnected from: ${docName}`);
+
+    // Remove all client states associated with this connection
+    if (connectionClientIDs.size > 0) {
+      // Create awareness update to remove these clients
+      awarenessProtocol.removeAwarenessStates(awareness, Array.from(connectionClientIDs), conn);
+      console.log(`❌ Client disconnected from: ${docName}, removed ${connectionClientIDs.size} client(s)`);
+    } else {
+      console.log(`❌ Client disconnected from: ${docName}`);
+    }
   });
 
   // Send sync step 1
