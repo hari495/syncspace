@@ -16,6 +16,9 @@ const docs = new Map();
 // Store awareness instances per document (shared across all clients)
 const awarenessInstances = new Map();
 
+// Store all connections per document for broadcasting
+const documentConnections = new Map();
+
 // Debounce timers for persistence
 const persistenceTimers = new Map();
 const SAVE_DEBOUNCE_MS = 2000; // Save after 2 seconds of inactivity
@@ -87,6 +90,36 @@ const setupWSConnection = async (conn, req, { docName = req.url.slice(1).split('
   // Get or create shared awareness for this document
   const awareness = getAwareness(docName, doc);
 
+  // Track this connection for broadcasting
+  if (!documentConnections.has(docName)) {
+    documentConnections.set(docName, new Set());
+  }
+  documentConnections.get(docName).add(conn);
+  console.log(`✅ Client connected to: ${docName}, total: ${documentConnections.get(docName).size}`);
+
+  // Broadcast document updates to all other clients
+  const docUpdateHandler = (update, origin) => {
+    // Don't broadcast back to the origin
+    if (origin === conn) return;
+
+    const encoder = encoding.createEncoder();
+    encoding.writeVarUint(encoder, messageSync);
+    syncProtocol.writeUpdate(encoder, update);
+    const message = encoding.toUint8Array(encoder);
+
+    // Broadcast to all clients connected to this document
+    const connections = documentConnections.get(docName);
+    if (connections) {
+      connections.forEach((client) => {
+        if (client !== conn && client.readyState === client.OPEN) {
+          client.send(message);
+        }
+      });
+    }
+  };
+
+  doc.on('update', docUpdateHandler);
+
   // Broadcast awareness updates to all connected clients
   const awarenessChangeHandler = ({ added, updated, removed }) => {
     const changedClients = added.concat(updated, removed);
@@ -141,6 +174,9 @@ const setupWSConnection = async (conn, req, { docName = req.url.slice(1).split('
   const connectionClientIDs = new Set();
 
   conn.on('close', () => {
+    // Remove document update listener
+    doc.off('update', docUpdateHandler);
+
     // Remove this connection's awareness updates
     awareness.off('update', awarenessChangeHandler);
 
@@ -151,6 +187,18 @@ const setupWSConnection = async (conn, req, { docName = req.url.slice(1).split('
       console.log(`❌ Client disconnected from: ${docName}, removed ${connectionClientIDs.size} client(s)`);
     } else {
       console.log(`❌ Client disconnected from: ${docName}`);
+    }
+
+    // Remove from connection tracking
+    const connections = documentConnections.get(docName);
+    if (connections) {
+      connections.delete(conn);
+      console.log(`📊 Remaining connections for ${docName}: ${connections.size}`);
+
+      // Clean up if no more connections
+      if (connections.size === 0) {
+        documentConnections.delete(docName);
+      }
     }
   });
 
