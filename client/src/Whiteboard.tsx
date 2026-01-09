@@ -192,13 +192,13 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
     getUserName();
   }, []);
 
-  // Update awareness when userName changes
+  // Update awareness when userName changes or provider is created
   useEffect(() => {
     if (providerRef.current && userName) {
       const awareness = providerRef.current.awareness;
       awareness.setLocalStateField('user', userName);
     }
-  }, [userName]);
+  }, [userName, roomName]); // roomName changing indicates provider recreation
 
   useEffect(() => {
     // Connect to the WebSocket server
@@ -227,7 +227,6 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
 
     // Set up awareness
     const awareness = provider.awareness;
-    awareness.setLocalStateField('user', userName);
 
     // Observe awareness changes for remote cursors
     const awarenessUpdateHandler = () => {
