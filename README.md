@@ -11,7 +11,7 @@
 
 ## ✨ **Features**
 
-- 🎨 **Real-Time Collaboration** - See your team's changes instantly with Y.js CRDT
+- 🎨 **Real-Time Collaboration** - See your team's changes instantly with Y.js CRDT(Conflict-free Replicated Data Type)
 - 🖌️ **Powerful Drawing Tools** - Rectangle, pencil, text, and selection tools
 - 🎨 **Unlimited Colors** - Built-in palette + custom color picker
 - 👥 **Team Management** - Role-based permissions (owner, editor, viewer)
