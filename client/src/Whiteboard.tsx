@@ -299,7 +299,7 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
       awareness.off('change', awarenessUpdateHandler);
       provider.destroy();
     };
-  }, [ydoc, shapesMap, userName]);
+  }, [ydoc, shapesMap, roomName]);
 
   // Attach transformer to selected shape(s)
   useEffect(() => {
