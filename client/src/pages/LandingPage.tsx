@@ -77,8 +77,8 @@ export function LandingPage() {
   ];
 
   const stats = [
-    { value: '10k+', label: 'Active Users' },
-    { value: '50k+', label: 'Whiteboards Created' },
+    { value: '300+', label: 'Active Users' },
+    { value: '1k+', label: 'Whiteboards Created' },
     { value: '99.9%', label: 'Uptime' },
     { value: '<100ms', label: 'Sync Speed' },
   ];
