@@ -201,6 +201,50 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
   }, [userName, roomName]); // roomName changing indicates provider recreation
 
   useEffect(() => {
+    // Initialize UndoManager
+    const undoManager = new Y.UndoManager(shapesMap);
+    undoManagerRef.current = undoManager;
+
+    // Observe changes to the Y.Map and update React state
+    // IMPORTANT: Attach observer BEFORE creating provider to catch all updates
+    const observer = (event: Y.YMapEvent<any>) => {
+      // Must extract changes synchronously before they expire
+      const changedKeys = new Map<string, { action: 'delete' | 'add' | 'update'; value?: any }>();
+      event.changes.keys.forEach((change, key) => {
+        if (change.action === 'delete') {
+          changedKeys.set(key, { action: 'delete' });
+        } else if (change.action === 'add' || change.action === 'update') {
+          const value = shapesMap.get(key);
+          changedKeys.set(key, { action: change.action, value });
+        }
+      });
+
+      // Only update if there are actual changes
+      if (changedKeys.size > 0) {
+        setShapes(prevShapes => {
+          const newShapes = new Map(prevShapes);
+          changedKeys.forEach((change, key) => {
+            if (change.action === 'delete') {
+              newShapes.delete(key);
+            } else if (change.value) {
+              newShapes.set(key, change.value as Shape);
+            }
+          });
+          return newShapes;
+        });
+      }
+    };
+
+    // Attach observer before creating provider to ensure we catch all updates
+    shapesMap.observe(observer);
+
+    // Initial sync - load existing shapes before connecting to WebSocket
+    const initialShapes = new Map<string, Shape>();
+    shapesMap.forEach((value, key) => {
+      initialShapes.set(key, value as Shape);
+    });
+    setShapes(initialShapes);
+
     // Connect to the WebSocket server
     // Auto-detect WebSocket URL based on environment
     const getWebSocketUrl = () => {
@@ -248,49 +292,14 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
 
     awareness.on('change', awarenessUpdateHandler);
 
-    // Initialize UndoManager
-    const undoManager = new Y.UndoManager(shapesMap);
-    undoManagerRef.current = undoManager;
+    // Log connection status for debugging
+    provider.on('status', (event: { status: string }) => {
+      console.log('[SyncSpace] WebSocket status:', event.status);
+    });
 
-    // Observe changes to the Y.Map and update React state
-    // Optimized: Extract changes synchronously, then update state
-    const observer = (event: Y.YMapEvent<any>) => {
-      // Must extract changes synchronously before they expire
-      const changedKeys = new Map<string, { action: 'delete' | 'add' | 'update'; value?: any }>();
-      event.changes.keys.forEach((change, key) => {
-        if (change.action === 'delete') {
-          changedKeys.set(key, { action: 'delete' });
-        } else if (change.action === 'add' || change.action === 'update') {
-          const value = shapesMap.get(key);
-          changedKeys.set(key, { action: change.action, value });
-        }
-      });
-
-      // Now update state with extracted changes
-      setShapes(prevShapes => {
-        const newShapes = new Map(prevShapes);
-        changedKeys.forEach((change, key) => {
-          if (change.action === 'delete') {
-            newShapes.delete(key);
-          } else if (change.value) {
-            newShapes.set(key, change.value as Shape);
-          }
-        });
-        return newShapes;
-      });
-    };
-
-    shapesMap.observe(observer);
-
-    // Initial sync - load all shapes
-    const initialSync = () => {
-      const newShapes = new Map<string, Shape>();
-      shapesMap.forEach((value, key) => {
-        newShapes.set(key, value as Shape);
-      });
-      setShapes(newShapes);
-    };
-    initialSync();
+    provider.on('sync', (isSynced: boolean) => {
+      console.log('[SyncSpace] Sync status:', isSynced ? 'synced' : 'syncing');
+    });
 
     // Cleanup
     return () => {
