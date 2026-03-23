@@ -2,7 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useWorkspace } from '@/hooks/useWorkspaces'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Users, Settings, Eye } from 'lucide-react'
-import { Whiteboard } from '../Whiteboard'
+import { Whiteboard } from '../components/whiteboard/Whiteboard'
 import { useAuth } from '@/hooks/useAuth'
 
 export function WorkspacePage() {

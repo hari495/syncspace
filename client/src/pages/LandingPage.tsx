@@ -46,7 +46,7 @@ export function LandingPage() {
     {
       icon: Palette,
       label: 'Drawing tools',
-      desc: 'Pen, shapes, text, selection. Everything you need, nothing you don't.',
+      desc: "Pen, shapes, text, selection. Everything you need, nothing you don't.",
     },
     {
       icon: Users,
@@ -56,7 +56,7 @@ export function LandingPage() {
     {
       icon: Infinity,
       label: 'Infinite canvas',
-      desc: 'Pan and zoom without limits. Your ideas don't fit in a box.',
+      desc: "Pan and zoom without limits. Your ideas don't fit in a box.",
     },
     {
       icon: Cloud,
