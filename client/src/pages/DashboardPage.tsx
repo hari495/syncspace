@@ -5,66 +5,35 @@ import { WorkspaceCard } from '@/components/workspace/WorkspaceCard'
 import { CreateWorkspaceDialog } from '@/components/workspace/CreateWorkspaceDialog'
 import { DeleteWorkspaceDialog } from '@/components/workspace/DeleteWorkspaceDialog'
 import type { Workspace } from '@/types/workspace'
-
-const mono = "'DM Mono', monospace"
-const serif = "'DM Serif Display', serif"
+import { p } from '@/styles/palette'
 
 export function DashboardPage() {
   const { user, signOut } = useAuth()
   const { data: workspaces, isLoading, error } = useWorkspaces()
   const [workspaceToDelete, setWorkspaceToDelete] = useState<Workspace | null>(null)
 
-  const displayName = user?.user_metadata?.full_name || user?.email || 'there'
+  const firstName = user?.user_metadata?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'you'
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0d0d0d', color: '#ede9e1' }}>
+    <div style={{ minHeight: '100vh', background: p.bg, color: p.text }}>
       {/* Nav */}
-      <nav style={{ borderBottom: '1px solid #1c1c1c' }}>
-        <div style={{
-          maxWidth: 1152,
-          margin: '0 auto',
-          padding: '0 32px',
-          height: 60,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>
+      <nav style={{ borderBottom: `1px solid ${p.border}`, position: 'sticky', top: 0, background: p.bg, zIndex: 10 }}>
+        <div style={{ maxWidth: 1152, margin: '0 auto', padding: '0 32px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 28, height: 28,
-              background: '#ede9e1',
-              borderRadius: 3,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0,
-            }}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0d0d0d" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <div style={{ width: 26, height: 26, background: p.accent, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={p.bg} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
               </svg>
             </div>
-            <span style={{ fontFamily: mono, fontSize: 14, color: '#ede9e1', letterSpacing: '-0.01em' }}>
-              syncspace
-            </span>
+            <span style={{ fontFamily: p.mono, fontSize: 13, color: p.text }}>syncspace</span>
           </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <span style={{ fontFamily: mono, fontSize: 12, color: '#333' }}>
-              {displayName}
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <span style={{ fontFamily: p.mono, fontSize: 12, color: p.dim }}>{user?.email}</span>
             <button
               onClick={signOut}
-              style={{
-                background: 'transparent',
-                border: '1px solid #222',
-                color: '#555',
-                padding: '7px 14px',
-                fontSize: 13,
-                fontFamily: mono,
-                cursor: 'pointer',
-                letterSpacing: '0.01em',
-                transition: 'color 0.15s, border-color 0.15s',
-              }}
-              onMouseOver={e => { e.currentTarget.style.color = '#ede9e1'; e.currentTarget.style.borderColor = '#444' }}
-              onMouseOut={e => { e.currentTarget.style.color = '#555'; e.currentTarget.style.borderColor = '#222' }}
+              style={{ background: 'transparent', border: `1px solid ${p.border}`, color: p.muted, padding: '6px 12px', fontSize: 12, fontFamily: p.mono, cursor: 'pointer', transition: 'color .15s, border-color .15s' }}
+              onMouseOver={e => { e.currentTarget.style.color = p.text; e.currentTarget.style.borderColor = p.border2 }}
+              onMouseOut={e =>  { e.currentTarget.style.color = p.muted; e.currentTarget.style.borderColor = p.border }}
             >
               Sign out
             </button>
@@ -73,26 +42,15 @@ export function DashboardPage() {
       </nav>
 
       {/* Content */}
-      <div style={{ maxWidth: 1152, margin: '0 auto', padding: '56px 32px' }}>
-        {/* Header row */}
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 48 }}>
+      <div style={{ maxWidth: 1152, margin: '0 auto', padding: '52px 32px' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 40 }}>
           <div>
-            <div style={{ fontFamily: mono, fontSize: 11, letterSpacing: '0.12em', color: '#333', textTransform: 'uppercase', marginBottom: 12 }}>
-              Workspaces
+            <div style={{ fontFamily: p.mono, fontSize: 11, letterSpacing: '0.1em', color: p.dim, textTransform: 'uppercase', marginBottom: 10 }}>
+              Dashboard
             </div>
-            <h1 style={{
-              fontFamily: serif,
-              fontSize: 'clamp(28px, 3.5vw, 44px)',
-              fontWeight: 400,
-              lineHeight: 1.1,
-              letterSpacing: '-0.02em',
-              color: '#ede9e1',
-              margin: 0,
-            }}>
-              Good to see you,{' '}
-              <em style={{ color: '#555' }}>
-                {user?.user_metadata?.full_name?.split(' ')[0] || 'you'}.
-              </em>
+            <h1 style={{ fontFamily: p.serif, fontSize: 'clamp(26px, 3vw, 40px)', fontWeight: 400, lineHeight: 1.1, letterSpacing: '-0.02em', color: p.text, margin: 0 }}>
+              Welcome back, <em style={{ color: p.accent }}>{firstName}.</em>
             </h1>
           </div>
           <CreateWorkspaceDialog />
@@ -100,77 +58,62 @@ export function DashboardPage() {
 
         {/* Loading */}
         {isLoading && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 0' }}>
-            <div style={{ fontFamily: mono, fontSize: 12, color: '#333', letterSpacing: '0.1em' }}>
-              loading...
-            </div>
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '80px 0' }}>
+            <span style={{ fontFamily: p.mono, fontSize: 12, color: p.dim, letterSpacing: '0.1em' }}>loading...</span>
           </div>
         )}
 
         {/* Error */}
         {error && (
-          <div style={{
-            border: '1px solid #2a1a1a',
-            background: '#1a0d0d',
-            padding: '16px 20px',
-            color: '#c0392b',
-            fontFamily: mono,
-            fontSize: 13,
-          }}>
+          <div style={{ border: `1px solid ${p.destroy}`, background: `${p.destroy}18`, padding: '16px 20px', fontFamily: p.mono, fontSize: 12, color: p.destroy }}>
             Failed to load workspaces. Please try again.
           </div>
         )}
 
-        {/* Empty state */}
-        {!isLoading && !error && workspaces && workspaces.length === 0 && (
-          <div style={{
-            border: '1px dashed #222',
-            padding: '80px 40px',
-            textAlign: 'center',
-          }}>
-            <div style={{
-              fontFamily: serif,
-              fontSize: 28,
-              fontWeight: 400,
-              color: '#ede9e1',
-              marginBottom: 12,
-            }}>
+        {/* Empty */}
+        {!isLoading && !error && workspaces?.length === 0 && (
+          <div style={{ border: `1px dashed ${p.border2}`, padding: '80px 40px', textAlign: 'center' }}>
+            <div style={{ fontFamily: p.serif, fontSize: 26, fontWeight: 400, color: p.text, marginBottom: 10 }}>
               No workspaces yet
             </div>
-            <p style={{ fontSize: 14, color: '#444', marginBottom: 32, fontWeight: 300 }}>
-              Create one to start collaborating
+            <p style={{ fontSize: 14, color: p.muted, marginBottom: 28, fontWeight: 300 }}>
+              Create one to start collaborating with your team
             </p>
             <CreateWorkspaceDialog />
           </div>
         )}
 
-        {/* Grid */}
+        {/* Workspace grid */}
         {!isLoading && !error && workspaces && workspaces.length > 0 && (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-            gap: '1px',
-            background: '#1c1c1c',
-            border: '1px solid #1c1c1c',
-          }}>
-            {workspaces.map((workspace) => (
-              <WorkspaceCard
-                key={workspace.id}
-                workspace={workspace}
-                onDelete={(id) => {
-                  const ws = workspaces.find((w) => w.id === id)
-                  if (ws) setWorkspaceToDelete(ws)
-                }}
-              />
-            ))}
-          </div>
+          <>
+            <div style={{ fontFamily: p.mono, fontSize: 11, color: p.dim, letterSpacing: '0.08em', marginBottom: 16 }}>
+              {workspaces.length} workspace{workspaces.length !== 1 ? 's' : ''}
+            </div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+              gap: 1,
+              background: p.border,
+            }}>
+              {workspaces.map(workspace => (
+                <WorkspaceCard
+                  key={workspace.id}
+                  workspace={workspace}
+                  onDelete={id => {
+                    const ws = workspaces.find(w => w.id === id)
+                    if (ws) setWorkspaceToDelete(ws)
+                  }}
+                />
+              ))}
+            </div>
+          </>
         )}
       </div>
 
       <DeleteWorkspaceDialog
         workspace={workspaceToDelete}
         open={!!workspaceToDelete}
-        onOpenChange={(open) => { if (!open) setWorkspaceToDelete(null) }}
+        onOpenChange={open => { if (!open) setWorkspaceToDelete(null) }}
       />
     </div>
   )

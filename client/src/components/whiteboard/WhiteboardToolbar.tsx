@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import type { Tool } from '@/types/whiteboard';
 import * as WHITEBOARD from '@/constants/whiteboard';
+import { p } from '@/styles/palette';
 
 interface WhiteboardToolbarProps {
   tool: Tool;
@@ -14,234 +15,116 @@ interface WhiteboardToolbarProps {
   onRedo: () => void;
 }
 
-const buttonBaseStyle: React.CSSProperties = {
-  padding: '10px 16px',
-  border: 'none',
-  borderRadius: '6px',
-  cursor: 'pointer',
-  fontSize: '14px',
-  fontWeight: '500',
-  transition: 'all 0.2s ease',
-  display: 'flex',
-  alignItems: 'center',
-  gap: '6px',
-  whiteSpace: 'nowrap'
-};
-
-const getToolButtonStyle = (isActive: boolean): React.CSSProperties => ({
-  ...buttonBaseStyle,
-  backgroundColor: isActive ? '#6366F1' : 'white',
-  color: isActive ? 'white' : '#374151',
-  boxShadow: isActive ? '0 2px 8px rgba(99, 102, 241, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-});
-
-const actionButtonStyle: React.CSSProperties = {
-  ...buttonBaseStyle,
-  backgroundColor: 'white',
-  color: '#6B7280',
-  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-};
-
 export const WhiteboardToolbar = memo(function WhiteboardToolbar({
-  tool,
-  selectedColor,
-  strokeWidth,
-  isViewer,
-  onToolChange,
-  onColorChange,
-  onStrokeWidthChange,
-  onUndo,
-  onRedo,
+  tool, selectedColor, strokeWidth, isViewer,
+  onToolChange, onColorChange, onStrokeWidthChange, onUndo, onRedo,
 }: WhiteboardToolbarProps) {
+  const btn = (active: boolean, disabled = false): React.CSSProperties => ({
+    padding: '7px 12px',
+    border: active ? `1px solid ${p.accent}` : `1px solid ${p.border}`,
+    background: active ? `${p.accent}22` : 'transparent',
+    color: active ? p.accent : disabled ? p.dim : p.muted,
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    fontSize: 12,
+    fontFamily: p.mono,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 5,
+    whiteSpace: 'nowrap' as const,
+    transition: 'border-color .15s, color .15s, background .15s',
+    opacity: disabled ? 0.4 : 1,
+  });
+
+  const divider = <div style={{ width: 1, background: p.border, alignSelf: 'stretch', margin: '0 4px' }} />;
+
   return (
     <div style={{
       position: 'absolute',
-      top: 16,
+      top: 12,
       left: '50%',
       transform: 'translateX(-50%)',
       zIndex: 1000,
       display: 'flex',
-      gap: '8px',
-      padding: '12px 16px',
-      backgroundColor: 'rgba(255, 255, 255, 0.95)',
-      borderRadius: '12px',
-      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05)',
-      backdropFilter: 'blur(10px)'
+      gap: 4,
+      padding: '8px 12px',
+      background: p.bg2,
+      border: `1px solid ${p.border2}`,
+      alignItems: 'center',
     }}>
-      {/* Tool Selection */}
-      <div style={{ display: 'flex', gap: '6px' }}>
+      {/* Tools */}
+      {[
+        { id: 'select',    label: 'Select',    icon: '↖' },
+        { id: 'rectangle', label: 'Rect',      icon: '▭' },
+        { id: 'circle',    label: 'Circle',    icon: '○' },
+        { id: 'line',      label: 'Line',      icon: '╱' },
+        { id: 'pencil',    label: 'Pencil',    icon: '✏' },
+        { id: 'text',      label: 'Text',      icon: 'T' },
+      ].map(({ id, label, icon }) => (
         <button
-          onClick={() => !isViewer && onToolChange(tool === 'select' ? null : 'select')}
-          style={{
-            ...getToolButtonStyle(tool === 'select'),
-            opacity: isViewer ? 0.5 : 1,
-            cursor: isViewer ? 'not-allowed' : 'pointer'
-          }}
-          title={isViewer ? "View only - editing disabled" : "Select Tool (V)"}
+          key={id}
+          onClick={() => !isViewer && onToolChange(tool === id ? null : id as Tool)}
+          style={btn(tool === id, isViewer)}
+          title={isViewer ? 'View only' : label}
           disabled={isViewer}
         >
-          <span style={{ fontSize: '16px' }}>↖</span>
-          <span>Select</span>
+          <span style={{ fontSize: 13 }}>{icon}</span>
+          <span>{label}</span>
         </button>
-        <button
-          onClick={() => !isViewer && onToolChange('rectangle')}
-          style={{
-            ...getToolButtonStyle(tool === 'rectangle'),
-            opacity: isViewer ? 0.5 : 1,
-            cursor: isViewer ? 'not-allowed' : 'pointer'
-          }}
-          title={isViewer ? "View only - editing disabled" : "Rectangle Tool (R)"}
-          disabled={isViewer}
-        >
-          <span style={{ fontSize: '16px' }}>▭</span>
-          <span>Rectangle</span>
-        </button>
-        <button
-          onClick={() => !isViewer && onToolChange('circle')}
-          style={{
-            ...getToolButtonStyle(tool === 'circle'),
-            opacity: isViewer ? 0.5 : 1,
-            cursor: isViewer ? 'not-allowed' : 'pointer'
-          }}
-          title={isViewer ? "View only - editing disabled" : "Circle Tool (C)"}
-          disabled={isViewer}
-        >
-          <span style={{ fontSize: '16px' }}>○</span>
-          <span>Circle</span>
-        </button>
-        <button
-          onClick={() => !isViewer && onToolChange('line')}
-          style={{
-            ...getToolButtonStyle(tool === 'line'),
-            opacity: isViewer ? 0.5 : 1,
-            cursor: isViewer ? 'not-allowed' : 'pointer'
-          }}
-          title={isViewer ? "View only - editing disabled" : "Line Tool (L)"}
-          disabled={isViewer}
-        >
-          <span style={{ fontSize: '16px' }}>╱</span>
-          <span>Line</span>
-        </button>
-        <button
-          onClick={() => !isViewer && onToolChange('pencil')}
-          style={{
-            ...getToolButtonStyle(tool === 'pencil'),
-            opacity: isViewer ? 0.5 : 1,
-            cursor: isViewer ? 'not-allowed' : 'pointer'
-          }}
-          title={isViewer ? "View only - editing disabled" : "Pencil Tool (P)"}
-          disabled={isViewer}
-        >
-          <span style={{ fontSize: '16px' }}>✏</span>
-          <span>Pencil</span>
-        </button>
-        <button
-          onClick={() => !isViewer && onToolChange('text')}
-          style={{
-            ...getToolButtonStyle(tool === 'text'),
-            opacity: isViewer ? 0.5 : 1,
-            cursor: isViewer ? 'not-allowed' : 'pointer'
-          }}
-          title={isViewer ? "View only - editing disabled" : "Text Tool (T)"}
-          disabled={isViewer}
-        >
-          <span style={{ fontSize: '16px', fontWeight: 'bold' }}>T</span>
-          <span>Text</span>
-        </button>
-      </div>
+      ))}
 
-      {/* Divider */}
-      {!isViewer && <div style={{ width: '1px', backgroundColor: '#E5E7EB', margin: '0 4px' }} />}
+      {!isViewer && divider}
 
-      {/* Color Picker */}
+      {/* Color palette */}
       {!isViewer && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '12px', color: '#6B7280', fontWeight: '500' }}>Color:</span>
-          <div style={{ display: 'flex', gap: '4px' }}>
-            {WHITEBOARD.COLOR_PALETTE.map((color) => (
-              <button
-                key={color}
-                onClick={() => onColorChange(color)}
-                style={{
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '6px',
-                  backgroundColor: color,
-                  border: selectedColor === color ? '3px solid #6366F1' : color === '#FFFFFF' ? '2px solid #E5E7EB' : '2px solid transparent',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  boxShadow: selectedColor === color ? '0 0 0 2px rgba(99, 102, 241, 0.2)' : '0 1px 2px rgba(0, 0, 0, 0.1)'
-                }}
-                title={color}
-              />
-            ))}
-            <input
-              type="color"
-              value={selectedColor}
-              onChange={(e) => onColorChange(e.target.value)}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          {WHITEBOARD.COLOR_PALETTE.map(color => (
+            <button
+              key={color}
+              onClick={() => onColorChange(color)}
+              title={color}
               style={{
-                width: '28px',
-                height: '28px',
-                borderRadius: '6px',
-                border: '2px solid #E5E7EB',
+                width: 22, height: 22,
+                background: color,
+                border: selectedColor === color ? `2px solid ${p.accent}` : `1px solid ${p.border2}`,
                 cursor: 'pointer',
-                padding: '0'
+                transition: 'border-color .15s',
+                flexShrink: 0,
               }}
-              title="Custom color"
             />
-          </div>
+          ))}
+          <input
+            type="color"
+            value={selectedColor}
+            onChange={e => onColorChange(e.target.value)}
+            title="Custom color"
+            style={{ width: 22, height: 22, border: `1px solid ${p.border2}`, padding: 0, cursor: 'pointer', background: 'transparent' }}
+          />
         </div>
       )}
 
-      {/* Divider */}
-      {!isViewer && <div style={{ width: '1px', backgroundColor: '#E5E7EB', margin: '0 4px' }} />}
+      {!isViewer && divider}
 
-      {/* Stroke Width Selector */}
+      {/* Stroke widths */}
       {!isViewer && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '12px', color: '#6B7280', fontWeight: '500' }}>Thickness:</span>
-          <div style={{ display: 'flex', gap: '4px' }}>
-            {WHITEBOARD.STROKE_WIDTHS.map((width, index) => (
-              <button
-                key={width}
-                onClick={() => onStrokeWidthChange(width)}
-                style={{
-                  ...buttonBaseStyle,
-                  padding: '6px 12px',
-                  backgroundColor: strokeWidth === width ? '#6366F1' : 'white',
-                  color: strokeWidth === width ? 'white' : '#374151',
-                  boxShadow: strokeWidth === width ? '0 2px 8px rgba(99, 102, 241, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                  fontSize: '12px'
-                }}
-                title={WHITEBOARD.STROKE_WIDTH_LABELS[index]}
-              >
-                {WHITEBOARD.STROKE_WIDTH_LABELS[index].split(' ')[0]}
-              </button>
-            ))}
-          </div>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {WHITEBOARD.STROKE_WIDTHS.map((width, i) => (
+            <button
+              key={width}
+              onClick={() => onStrokeWidthChange(width)}
+              style={btn(strokeWidth === width)}
+              title={WHITEBOARD.STROKE_WIDTH_LABELS[i]}
+            >
+              {WHITEBOARD.STROKE_WIDTH_LABELS[i].split(' ')[0]}
+            </button>
+          ))}
         </div>
       )}
 
-      {/* Divider */}
-      {!isViewer && <div style={{ width: '1px', backgroundColor: '#E5E7EB', margin: '0 4px' }} />}
+      {divider}
 
-      {/* Undo/Redo */}
-      <div style={{ display: 'flex', gap: '6px' }}>
-        <button
-          onClick={onUndo}
-          style={actionButtonStyle}
-          title="Undo (Ctrl+Z)"
-        >
-          <span style={{ fontSize: '16px' }}>↶</span>
-        </button>
-        <button
-          onClick={onRedo}
-          style={actionButtonStyle}
-          title="Redo (Ctrl+Y)"
-        >
-          <span style={{ fontSize: '16px' }}>↷</span>
-        </button>
-      </div>
+      {/* Undo / Redo */}
+      <button onClick={onUndo} style={btn(false)} title="Undo (Ctrl+Z)"><span style={{ fontSize: 14 }}>↶</span></button>
+      <button onClick={onRedo} style={btn(false)} title="Redo (Ctrl+Y)"><span style={{ fontSize: 14 }}>↷</span></button>
     </div>
   );
 });

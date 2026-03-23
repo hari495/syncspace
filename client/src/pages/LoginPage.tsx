@@ -1,95 +1,46 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { p } from '@/styles/palette'
 
 export function LoginPage() {
   const { user, signInWithGoogle } = useAuth()
   const navigate = useNavigate()
 
   useEffect(() => {
-    if (user) {
-      navigate('/dashboard', { replace: true })
-    }
+    if (user) navigate('/dashboard', { replace: true })
   }, [user, navigate])
 
   const handleGoogleSignIn = async () => {
-    try {
-      await signInWithGoogle()
-    } catch (error) {
-      console.error('Error signing in:', error)
-    }
+    try { await signInWithGoogle() }
+    catch (error) { console.error('Error signing in:', error) }
   }
 
-  const mono = "'DM Mono', monospace"
-  const serif = "'DM Serif Display', serif"
-
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#0d0d0d',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 24,
-    }}>
+    <div style={{ minHeight: '100vh', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div style={{ width: '100%', maxWidth: 360 }}>
         {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 48 }}>
-          <div style={{
-            width: 28, height: 28,
-            background: '#ede9e1',
-            borderRadius: 3,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0,
-          }}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0d0d0d" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 52 }}>
+          <div style={{ width: 28, height: 28, background: p.accent, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={p.bg} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
             </svg>
           </div>
-          <span style={{ fontFamily: mono, fontSize: 14, color: '#ede9e1', letterSpacing: '-0.01em' }}>
-            syncspace
-          </span>
+          <span style={{ fontFamily: p.mono, fontSize: 14, color: p.text }}>syncspace</span>
         </div>
 
-        {/* Heading */}
-        <h1 style={{
-          fontFamily: serif,
-          fontSize: 36,
-          fontWeight: 400,
-          lineHeight: 1.1,
-          letterSpacing: '-0.02em',
-          color: '#ede9e1',
-          marginBottom: 8,
-          marginTop: 0,
-        }}>
+        <h1 style={{ fontFamily: p.serif, fontSize: 36, fontWeight: 400, lineHeight: 1.1, letterSpacing: '-0.02em', color: p.text, marginBottom: 8, marginTop: 0 }}>
           Sign in
         </h1>
-        <p style={{ fontSize: 14, color: '#555', marginBottom: 36, fontWeight: 300 }}>
+        <p style={{ fontSize: 14, color: p.muted, marginBottom: 36, fontWeight: 300 }}>
           Continue to your workspaces
         </p>
 
-        {/* Google button */}
         <button
           onClick={handleGoogleSignIn}
-          style={{
-            width: '100%',
-            background: 'transparent',
-            border: '1px solid #2a2a2a',
-            color: '#ede9e1',
-            padding: '13px 20px',
-            fontSize: 14,
-            fontFamily: "'DM Sans', sans-serif",
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 10,
-            letterSpacing: '-0.01em',
-            transition: 'border-color 0.15s',
-            marginBottom: 20,
-          }}
-          onMouseOver={e => (e.currentTarget.style.borderColor = '#444')}
-          onMouseOut={e => (e.currentTarget.style.borderColor = '#2a2a2a')}
+          style={{ width: '100%', background: 'transparent', border: `1px solid ${p.border2}`, color: p.text, padding: '13px 20px', fontSize: 14, fontFamily: p.sans, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, letterSpacing: '-0.01em', transition: 'border-color .15s', marginBottom: 20 }}
+          onMouseOver={e => (e.currentTarget.style.borderColor = p.accent)}
+          onMouseOut={e =>  (e.currentTarget.style.borderColor = p.border2)}
         >
           <svg width="18" height="18" viewBox="0 0 24 24">
             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -100,7 +51,7 @@ export function LoginPage() {
           Continue with Google
         </button>
 
-        <p style={{ fontSize: 12, color: '#333', textAlign: 'center', fontFamily: mono }}>
+        <p style={{ fontSize: 12, color: p.dim, textAlign: 'center', fontFamily: p.mono }}>
           No account needed — sign in creates one
         </p>
       </div>

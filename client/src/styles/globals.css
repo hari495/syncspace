@@ -1,45 +1,55 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap');
 @import "tailwindcss";
 
+/* ── Tobacco palette ─────────────────────────────── */
+:root {
+  --bg:          #100d08;
+  --bg-2:        #17130c;
+  --bg-3:        #1e1910;
+  --border:      #241e12;
+  --border-2:    #302818;
+  --text:        #f0e6c8;
+  --text-muted:  #6a5538;
+  --text-dim:    #362b1c;
+  --accent:      #c87030;
+  --accent-h:    #e08840;
+  --destructive: #b84040;
+}
+
 @theme {
-  --color-background: #0d0d0d;
-  --color-foreground: #ede9e1;
-  --color-card: #111111;
-  --color-card-foreground: #ede9e1;
-  --color-popover: #111111;
-  --color-popover-foreground: #ede9e1;
-  --color-primary: #ede9e1;
-  --color-primary-foreground: #0d0d0d;
-  --color-secondary: #1a1a1a;
-  --color-secondary-foreground: #ede9e1;
-  --color-muted: #1a1a1a;
-  --color-muted-foreground: #555555;
-  --color-accent: #1c1c1c;
-  --color-accent-foreground: #ede9e1;
-  --color-destructive: #c0392b;
-  --color-destructive-foreground: #ede9e1;
-  --color-border: #1c1c1c;
-  --color-input: #1c1c1c;
-  --color-ring: #ede9e1;
-  --radius: 0rem;
+  --color-background:           var(--bg);
+  --color-foreground:           var(--text);
+  --color-card:                 var(--bg-2);
+  --color-card-foreground:      var(--text);
+  --color-popover:              var(--bg-2);
+  --color-popover-foreground:   var(--text);
+  --color-primary:              var(--text);
+  --color-primary-foreground:   var(--bg);
+  --color-secondary:            var(--bg-3);
+  --color-secondary-foreground: var(--text);
+  --color-muted:                var(--bg-2);
+  --color-muted-foreground:     var(--text-muted);
+  --color-accent:               var(--bg-3);
+  --color-accent-foreground:    var(--text);
+  --color-destructive:          var(--destructive);
+  --color-destructive-foreground: var(--text);
+  --color-border:               var(--border);
+  --color-input:                var(--border);
+  --color-ring:                 var(--accent);
+  --radius:                     0rem;
 }
 
 * {
-  border-color: var(--color-border);
+  border-color: var(--border);
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  background-color: var(--color-background);
-  color: var(--color-foreground);
+  background-color: var(--bg);
+  color: var(--text);
   font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-/* Override shadcn default radius to be sharp */
-[data-radix-popper-content-wrapper] * {
-  border-radius: 0 !important;
 }

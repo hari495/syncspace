@@ -1,0 +1,16 @@
+export const p = {
+  bg:         '#100d08',
+  bg2:        '#17130c',
+  bg3:        '#1e1910',
+  border:     '#241e12',
+  border2:    '#302818',
+  text:       '#f0e6c8',
+  muted:      '#6a5538',
+  dim:        '#362b1c',
+  accent:     '#c87030',
+  accentH:    '#e08840',
+  destroy:    '#b84040',
+  mono:       "'DM Mono', monospace",
+  serif:      "'DM Serif Display', serif",
+  sans:       "'DM Sans', sans-serif",
+} as const
