@@ -30,7 +30,7 @@ export function WorkspaceCard({ workspace, onDelete }: WorkspaceCardProps) {
       tabIndex={0}
       onClick={() => navigate(`/workspace/${workspace.id}`)}
       onKeyDown={e => e.key === 'Enter' && navigate(`/workspace/${workspace.id}`)}
-      style={{ background: p.bg2, padding: '28px 28px 22px', cursor: 'pointer', position: 'relative', transition: 'background .15s', display: 'flex', flexDirection: 'column', gap: 0 }}
+      style={{ background: p.bg2, padding: '28px 28px 22px', cursor: 'pointer', position: 'relative', transition: 'background .15s', display: 'flex', flexDirection: 'column', gap: 0, border: `1px solid ${p.border}` }}
       onMouseOver={e => (e.currentTarget.style.background = p.bg3)}
       onMouseOut={e =>  (e.currentTarget.style.background = p.bg2)}
     >

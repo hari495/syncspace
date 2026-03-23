@@ -92,8 +92,7 @@ export function DashboardPage() {
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-              gap: 1,
-              background: p.border,
+              gap: 0,
             }}>
               {workspaces.map(workspace => (
                 <WorkspaceCard
