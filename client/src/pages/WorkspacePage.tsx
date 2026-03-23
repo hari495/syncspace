@@ -1,9 +1,11 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useWorkspace } from '@/hooks/useWorkspaces'
-import { Button } from '@/components/ui/button'
-import { ArrowLeft, Users, Settings, Eye } from 'lucide-react'
+import { ArrowLeft, Users, Eye } from 'lucide-react'
 import { Whiteboard } from '../components/whiteboard/Whiteboard'
 import { useAuth } from '@/hooks/useAuth'
+
+const mono = "'DM Mono', monospace"
+const serif = "'DM Serif Display', serif"
 
 export function WorkspacePage() {
   const { workspaceId } = useParams<{ workspaceId: string }>()
@@ -13,85 +15,116 @@ export function WorkspacePage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading workspace...</p>
-        </div>
+      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: '#0d0d0d' }}>
+        <span style={{ fontFamily: mono, fontSize: 12, color: '#333', letterSpacing: '0.1em' }}>
+          loading...
+        </span>
       </div>
     )
   }
 
   if (error || !workspace) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-2">Workspace not found</h2>
-          <p className="text-muted-foreground mb-4">
-            This workspace doesn't exist or you don't have access to it.
+      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: '#0d0d0d' }}>
+        <div style={{ textAlign: 'center' }}>
+          <h2 style={{ fontFamily: serif, fontSize: 28, fontWeight: 400, color: '#ede9e1', marginBottom: 8 }}>
+            Workspace not found
+          </h2>
+          <p style={{ fontSize: 14, color: '#444', marginBottom: 28, fontWeight: 300 }}>
+            This workspace doesn't exist or you don't have access.
           </p>
-          <Button onClick={() => navigate('/dashboard')}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Dashboard
-          </Button>
+          <button
+            onClick={() => navigate('/dashboard')}
+            style={{
+              background: 'transparent',
+              border: '1px solid #2a2a2a',
+              color: '#ede9e1',
+              padding: '10px 20px',
+              fontSize: 13,
+              fontFamily: mono,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              transition: 'border-color 0.15s',
+            }}
+            onMouseOver={e => (e.currentTarget.style.borderColor = '#555')}
+            onMouseOut={e => (e.currentTarget.style.borderColor = '#2a2a2a')}
+          >
+            <ArrowLeft size={13} /> Back to dashboard
+          </button>
         </div>
       </div>
     )
   }
 
   const memberCount = workspace.workspace_members?.length || 0
-
-  // Get current user's role
-  const currentMember = workspace.workspace_members?.find(
-    (member) => member.user_id === user?.id
-  )
+  const currentMember = workspace.workspace_members?.find(m => m.user_id === user?.id)
   const userRole = currentMember?.role || 'viewer'
   const isViewer = userRole === 'viewer'
 
   return (
-    <div className="flex h-screen flex-col">
+    <div style={{ display: 'flex', height: '100vh', flexDirection: 'column', background: '#0d0d0d' }}>
       {/* Header */}
-      <div className="border-b bg-background px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
+      <div style={{ borderBottom: '1px solid #1c1c1c', background: '#0d0d0d', padding: '0 16px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 52 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button
               onClick={() => navigate('/dashboard')}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#444',
+                cursor: 'pointer',
+                padding: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                transition: 'color 0.15s',
+              }}
+              onMouseOver={e => (e.currentTarget.style.color = '#ede9e1')}
+              onMouseOut={e => (e.currentTarget.style.color = '#444')}
             >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg font-semibold">{workspace.name}</h1>
-                {isViewer && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 text-xs font-medium">
-                    <Eye className="h-3 w-3" />
-                    View Only
-                  </span>
-                )}
-              </div>
-              {workspace.description && (
-                <p className="text-sm text-muted-foreground">
-                  {workspace.description}
-                </p>
+              <ArrowLeft size={16} />
+            </button>
+            <div style={{ width: 1, height: 20, background: '#1c1c1c' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontFamily: mono, fontSize: 13, color: '#ede9e1', letterSpacing: '-0.01em' }}>
+                {workspace.name}
+              </span>
+              {isViewer && (
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '2px 8px',
+                  border: '1px solid #2a2a2a',
+                  color: '#555',
+                  fontFamily: mono,
+                  fontSize: 11,
+                  letterSpacing: '0.05em',
+                }}>
+                  <Eye size={10} /> view only
+                </span>
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted text-sm">
-              <Users className="h-4 w-4" />
-              <span>{memberCount}</span>
-            </div>
-            <Button variant="outline" size="icon">
-              <Settings className="h-4 w-4" />
-            </Button>
+
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            fontFamily: mono,
+            fontSize: 12,
+            color: '#333',
+          }}>
+            <Users size={13} />
+            <span>{memberCount}</span>
           </div>
         </div>
       </div>
 
       {/* Whiteboard */}
-      <div className="flex-1 overflow-hidden">
+      <div style={{ flex: 1, overflow: 'hidden' }}>
         <Whiteboard
           roomName={`workspace-${workspaceId}`}
           workspaceId={workspaceId}

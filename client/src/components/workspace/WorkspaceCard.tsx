@@ -1,9 +1,9 @@
 import { useNavigate } from 'react-router-dom'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Trash2, Users } from 'lucide-react'
 import type { Workspace } from '@/types/workspace'
 import { formatDistanceToNow } from 'date-fns'
+
+const mono = "'DM Mono', monospace"
 
 interface WorkspaceCardProps {
   workspace: Workspace
@@ -13,55 +13,93 @@ interface WorkspaceCardProps {
 export function WorkspaceCard({ workspace, onDelete }: WorkspaceCardProps) {
   const navigate = useNavigate()
 
-  const isOwner = workspace.workspace_members?.some(
-    (member) => member.role === 'owner'
-  )
-
+  const isOwner = workspace.workspace_members?.some(m => m.role === 'owner')
   const memberCount = workspace.workspace_members?.length || 0
 
   return (
-    <Card
-      className="group cursor-pointer transition-all hover:shadow-lg hover:border-primary/50"
+    <div
       onClick={() => navigate(`/workspace/${workspace.id}`)}
+      style={{
+        background: '#0d0d0d',
+        padding: '28px 28px 20px',
+        cursor: 'pointer',
+        position: 'relative',
+        transition: 'background 0.15s',
+      }}
+      onMouseOver={e => (e.currentTarget.style.background = '#111')}
+      onMouseOut={e => (e.currentTarget.style.background = '#0d0d0d')}
     >
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <CardTitle className="text-xl">{workspace.name}</CardTitle>
-            {workspace.description && (
-              <CardDescription className="mt-2 line-clamp-2">
-                {workspace.description}
-              </CardDescription>
-            )}
-          </div>
-          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            {isOwner && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-destructive hover:text-destructive"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onDelete(workspace.id)
-                }}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+      {/* Delete button */}
+      {isOwner && (
+        <button
+          onClick={e => { e.stopPropagation(); onDelete(workspace.id) }}
+          style={{
+            position: 'absolute',
+            top: 16,
+            right: 16,
+            background: 'transparent',
+            border: 'none',
+            color: '#2a2a2a',
+            cursor: 'pointer',
+            padding: 4,
+            display: 'flex',
+            alignItems: 'center',
+            transition: 'color 0.15s',
+          }}
+          onMouseOver={e => (e.currentTarget.style.color = '#c0392b')}
+          onMouseOut={e => (e.currentTarget.style.color = '#2a2a2a')}
+        >
+          <Trash2 size={14} />
+        </button>
+      )}
+
+      {/* Name */}
+      <div style={{
+        fontFamily: mono,
+        fontSize: 14,
+        color: '#ede9e1',
+        marginBottom: 6,
+        paddingRight: 24,
+        letterSpacing: '-0.01em',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+      }}>
+        {workspace.name}
+      </div>
+
+      {/* Description */}
+      {workspace.description && (
+        <div style={{
+          fontSize: 13,
+          color: '#3a3a3a',
+          marginBottom: 20,
+          fontWeight: 300,
+          lineHeight: 1.5,
+          display: '-webkit-box',
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
+        }}>
+          {workspace.description}
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <Users className="h-4 w-4" />
-            <span>{memberCount} {memberCount === 1 ? 'member' : 'members'}</span>
-          </div>
-          <span>
-            Updated {formatDistanceToNow(new Date(workspace.updated_at), { addSuffix: true })}
-          </span>
+      )}
+
+      {/* Footer */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: workspace.description ? 0 : 20,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: mono, fontSize: 11, color: '#2a2a2a' }}>
+          <Users size={11} />
+          <span>{memberCount}</span>
         </div>
-      </CardContent>
-    </Card>
+        <span style={{ fontFamily: mono, fontSize: 11, color: '#252525' }}>
+          {formatDistanceToNow(new Date(workspace.updated_at), { addSuffix: true })}
+        </span>
+      </div>
+    </div>
   )
 }

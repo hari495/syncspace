@@ -1,30 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --color-background: #ffffff;
-  --color-foreground: #0f172a;
-  --color-card: #ffffff;
-  --color-card-foreground: #0f172a;
-  --color-popover: #ffffff;
-  --color-popover-foreground: #0f172a;
-  --color-primary: #1e293b;
-  --color-primary-foreground: #f8fafc;
-  --color-secondary: #f1f5f9;
-  --color-secondary-foreground: #1e293b;
-  --color-muted: #f1f5f9;
-  --color-muted-foreground: #64748b;
-  --color-accent: #f1f5f9;
-  --color-accent-foreground: #1e293b;
-  --color-destructive: #ef4444;
-  --color-destructive-foreground: #f8fafc;
-  --color-border: #e2e8f0;
-  --color-input: #e2e8f0;
-  --color-ring: #0f172a;
-  --radius: 0.5rem;
+  --color-background: #0d0d0d;
+  --color-foreground: #ede9e1;
+  --color-card: #111111;
+  --color-card-foreground: #ede9e1;
+  --color-popover: #111111;
+  --color-popover-foreground: #ede9e1;
+  --color-primary: #ede9e1;
+  --color-primary-foreground: #0d0d0d;
+  --color-secondary: #1a1a1a;
+  --color-secondary-foreground: #ede9e1;
+  --color-muted: #1a1a1a;
+  --color-muted-foreground: #555555;
+  --color-accent: #1c1c1c;
+  --color-accent-foreground: #ede9e1;
+  --color-destructive: #c0392b;
+  --color-destructive-foreground: #ede9e1;
+  --color-border: #1c1c1c;
+  --color-input: #1c1c1c;
+  --color-ring: #ede9e1;
+  --radius: 0rem;
 }
 
 * {
   border-color: var(--color-border);
+  box-sizing: border-box;
 }
 
 body {
@@ -32,5 +34,12 @@ body {
   min-height: 100vh;
   background-color: var(--color-background);
   color: var(--color-foreground);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Override shadcn default radius to be sharp */
+[data-radix-popper-content-wrapper] * {
+  border-radius: 0 !important;
 }

@@ -20,10 +20,13 @@ const PageLoader = () => (
     alignItems: 'center',
     justifyContent: 'center',
     height: '100vh',
-    fontSize: '18px',
-    color: '#6366F1'
+    background: '#0d0d0d',
+    fontFamily: "'DM Mono', monospace",
+    fontSize: 12,
+    letterSpacing: '0.1em',
+    color: '#333',
   }}>
-    Loading...
+    loading...
   </div>
 )
 
