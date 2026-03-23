@@ -404,6 +404,17 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
     };
   }, [selectedId, selectedIds, shapesMap]);
 
+  // Update stage cursor based on active tool
+  useEffect(() => {
+    const container = stageRef.current?.container();
+    if (!container) return;
+    if (tool === null || isViewer) {
+      container.style.cursor = 'grab';
+    } else {
+      container.style.cursor = 'default';
+    }
+  }, [tool, isViewer]);
+
   // Auto-focus textarea when editing starts
   useEffect(() => {
     if (editingTextId && textareaRef.current) {
@@ -506,6 +517,18 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
       shapesMap.set(shapeId, updatedShape);
     }
   }, [shapesMap]);
+
+  // Update local state immediately on drag to keep React in sync with Konva visuals.
+  // This prevents Y.js observer re-renders from snapping the shape back mid-drag.
+  const handleDragMove = useCallback((shapeId: string, e: any) => {
+    setShapes(prev => {
+      const shape = prev.get(shapeId);
+      if (!shape) return prev;
+      const newMap = new Map(prev);
+      newMap.set(shapeId, { ...shape, x: e.target.x(), y: e.target.y() });
+      return newMap;
+    });
+  }, []);
 
   const handleDragEnd = useCallback((shapeId: string, e: any) => {
     const shape = shapesMap.get(shapeId);
@@ -806,7 +829,7 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
     if (isPanning.current) {
       isPanning.current = false;
       if (stage) {
-        stage.container().style.cursor = 'default';
+        stage.container().style.cursor = tool === null || isViewer ? 'grab' : 'default';
       }
       return;
     }
@@ -1595,9 +1618,15 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onClick={handleStageClick}
+        onDragStart={() => {
+          const container = stageRef.current?.container();
+          if (container) container.style.cursor = 'grabbing';
+        }}
         onDragEnd={(e) => {
           const stage = e.target;
           setStagePos({ x: stage.x(), y: stage.y() });
+          const container = stageRef.current?.container();
+          if (container) container.style.cursor = tool === null || isViewer ? 'grab' : 'default';
         }}
       >
         {/* Background Layer with Infinite Grid Pattern */}
@@ -1642,6 +1671,7 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
                   canEdit={canEdit}
                   tool={tool}
                   onClick={() => handleShapeClick(shape.id)}
+                  onDragMove={(e) => handleDragMove(shape.id, e)}
                   onDragEnd={(e) => handleDragEnd(shape.id, e)}
                   onTransformEnd={(e) => handleTransformEnd(shape.id, e)}
                   shapeRef={shapeRef}
@@ -1664,6 +1694,7 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
                   canEdit={canEdit}
                   tool={tool}
                   onClick={() => handleShapeClick(shape.id)}
+                  onDragMove={(e) => handleDragMove(shape.id, e)}
                   onDragEnd={(e) => handleDragEnd(shape.id, e)}
                   onTransformEnd={(e) => handleTransformEnd(shape.id, e)}
                   shapeRef={shapeRef}
@@ -1685,6 +1716,7 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
                   canEdit={canEdit}
                   tool={tool}
                   onClick={() => handleShapeClick(shape.id)}
+                  onDragMove={(e) => handleDragMove(shape.id, e)}
                   onDragEnd={(e) => handleDragEnd(shape.id, e)}
                   shapeRef={shapeRef}
                 />
@@ -1710,6 +1742,7 @@ export const Whiteboard = ({ roomName = 'syncspace-room', workspaceId, workspace
                   tool={tool}
                   onClick={() => handleShapeClick(shape.id)}
                   onDblClick={() => handleTextDoubleClick(shape.id)}
+                  onDragMove={(e) => handleDragMove(shape.id, e)}
                   onDragEnd={(e) => handleDragEnd(shape.id, e)}
                   onTransformEnd={(e) => handleTransformEnd(shape.id, e)}
                   shapeRef={shapeRef}

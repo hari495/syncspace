@@ -15,6 +15,7 @@ interface BaseShapeProps {
   canEdit: boolean;
   tool: string | null;
   onClick: () => void;
+  onDragMove?: (e: any) => void;
   onDragEnd: (e: any) => void;
   onTransformEnd: (e: any) => void;
   shapeRef: (node: Konva.Shape | null) => void;
@@ -55,6 +56,7 @@ export const MemoizedRectangle = memo(function MemoizedRectangle({
   canEdit,
   tool,
   onClick,
+  onDragMove,
   onDragEnd,
   onTransformEnd,
   shapeRef,
@@ -76,6 +78,7 @@ export const MemoizedRectangle = memo(function MemoizedRectangle({
       draggable={tool === 'select' && canEdit}
       onClick={onClick}
       onTap={onClick}
+      onDragMove={onDragMove}
       onDragEnd={onDragEnd}
       onTransformEnd={onTransformEnd}
     />
@@ -96,6 +99,7 @@ export const MemoizedCircle = memo(function MemoizedCircle({
   canEdit,
   tool,
   onClick,
+  onDragMove,
   onDragEnd,
   onTransformEnd,
   shapeRef,
@@ -116,6 +120,7 @@ export const MemoizedCircle = memo(function MemoizedCircle({
       draggable={tool === 'select' && canEdit}
       onClick={onClick}
       onTap={onClick}
+      onDragMove={onDragMove}
       onDragEnd={onDragEnd}
       onTransformEnd={onTransformEnd}
     />
@@ -132,6 +137,7 @@ export const MemoizedLine = memo(function MemoizedLine({
   canEdit,
   tool,
   onClick,
+  onDragMove,
   onDragEnd,
   shapeRef,
 }: Omit<LineShapeProps, 'onTransformEnd' | 'isSelected'>) {
@@ -151,6 +157,7 @@ export const MemoizedLine = memo(function MemoizedLine({
       draggable={tool === 'select' && canEdit}
       onClick={onClick}
       onTap={onClick}
+      onDragMove={onDragMove}
       onDragEnd={onDragEnd}
     />
   );
@@ -170,6 +177,7 @@ export const MemoizedText = memo(function MemoizedText({
   tool,
   onClick,
   onDblClick,
+  onDragMove,
   onDragEnd,
   onTransformEnd,
   shapeRef,
@@ -199,6 +207,7 @@ export const MemoizedText = memo(function MemoizedText({
       onTap={onClick}
       onDblClick={onDblClick}
       onDblTap={onDblClick}
+      onDragMove={onDragMove}
       onDragEnd={onDragEnd}
       onTransformEnd={onTransformEnd}
     />
