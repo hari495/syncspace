@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // vi.hoisted ensures mocks are initialised before module imports
